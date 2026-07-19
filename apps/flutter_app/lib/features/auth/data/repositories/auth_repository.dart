@@ -75,19 +75,27 @@ class AuthRepositoryImpl implements AuthRepository {
       );
 
       final user = response.user;
+      developer.log('AuthRepository: signIn completed, user=${user?.id ?? 'null'}', name: 'Auth');
+
       if (user != null) {
-        developer.log('AuthRepository: Login successful, userId=${user.id}', name: 'Auth');
+        developer.log('AuthRepository: Login successful, userId=${user.id}, email=${user.email}', name: 'Auth');
 
         // Fetch profile from Supabase profiles table
+        developer.log('AuthRepository: Fetching profile for userId=${user.id}', name: 'Auth');
         final profile = await fetchProfile(user.id);
+        
+        if (profile != null) {
+          developer.log('AuthRepository: Profile found - role=${profile.role}', name: 'Auth');
+        } else {
+          developer.log('AuthRepository: No profile found, using defaults', name: 'Auth');
+        }
+        
         final role = profile?.role ?? 'user';
-
-        developer.log('AuthRepository: Fetched profile role=$role', name: 'Auth');
 
         return AuthResponse(
           success: true,
           userId: user.id,
-          email: user.email,
+          email: user.email ?? '',
           name: profile?.name ?? user.userMetadata?['name'] ?? '',
           role: role,
         );
@@ -99,13 +107,13 @@ class AuthRepositoryImpl implements AuthRepository {
         );
       }
     } on AuthException catch (e) {
-      developer.log('AuthRepository: Login failed - ${e.message}', name: 'Auth');
+      developer.log('AuthRepository: Login failed - AuthException: ${e.message}', name: 'Auth');
       return AuthResponse(
         success: false,
         error: e.message,
       );
     } catch (e) {
-      developer.log('AuthRepository: Login failed - $e', name: 'Auth');
+      developer.log('AuthRepository: Login failed - Exception: $e', name: 'Auth');
       return AuthResponse(
         success: false,
         error: 'An unexpected error occurred',
@@ -196,11 +204,36 @@ class AuthRepositoryImpl implements AuthRepository {
         return null;
       }
 
-      developer.log('AuthRepository: getCurrentUser - userId=${user.id}', name: 'Auth');
+      developer.log('AuthRepository: getCurrentUser - userId=${user.id}, email=${user.email}', name: 'Auth');
 
-      return fetchProfile(user.id);
+      final profile = await fetchProfile(user.id);
+      
+      if (profile != null) {
+        developer.log('AuthRepository: getCurrentUser - profile found, role=${profile.role}', name: 'Auth');
+      } else {
+        developer.log('AuthRepository: getCurrentUser - no profile found', name: 'Auth');
+        // Return a default profile so auth still works
+        return UserProfile(
+          id: user.id,
+          email: user.email ?? '',
+          name: user.userMetadata?['name'] ?? '',
+          role: 'user',
+        );
+      }
+      
+      return profile;
     } catch (e) {
       developer.log('AuthRepository: getCurrentUser failed - $e', name: 'Auth');
+      // Return default profile on error to not block auth
+      final user = _supabaseService.currentUser;
+      if (user != null) {
+        return UserProfile(
+          id: user.id,
+          email: user.email ?? '',
+          name: user.userMetadata?['name'] ?? '',
+          role: 'user',
+        );
+      }
       return null;
     }
   }
@@ -208,7 +241,7 @@ class AuthRepositoryImpl implements AuthRepository {
   @override
   Future<UserProfile?> fetchProfile(String userId) async {
     try {
-      developer.log('AuthRepository: Fetching profile for userId=$userId', name: 'Auth');
+      developer.log('AuthRepository: fetchProfile - querying profiles table for userId=$userId', name: 'Auth');
 
       final response = await _supabaseService.client
           .from('profiles')
@@ -217,9 +250,11 @@ class AuthRepositoryImpl implements AuthRepository {
           .maybeSingle();
 
       if (response == null) {
-        developer.log('AuthRepository: No profile found for userId=$userId', name: 'Auth');
+        developer.log('AuthRepository: fetchProfile - no row found in profiles table', name: 'Auth');
         return null;
       }
+
+      developer.log('AuthRepository: fetchProfile - row found: $response', name: 'Auth');
 
       final profile = UserProfile(
         id: response['id'] as String,
@@ -228,11 +263,11 @@ class AuthRepositoryImpl implements AuthRepository {
         role: response['role'] as String? ?? 'user',
       );
 
-      developer.log('AuthRepository: Profile fetched - role=${profile.role}', name: 'Auth');
+      developer.log('AuthRepository: fetchProfile - parsed profile: id=${profile.id}, role=${profile.role}', name: 'Auth');
 
       return profile;
     } catch (e) {
-      developer.log('AuthRepository: fetchProfile failed - $e', name: 'Auth');
+      developer.log('AuthRepository: fetchProfile - error: $e', name: 'Auth');
       return null;
     }
   }

@@ -19,6 +19,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   late AnimationController _controller;
   late Animation<double> _fadeAnimation;
   late Animation<double> _scaleAnimation;
+  bool _hasNavigated = false;
 
   @override
   void initState() {
@@ -47,22 +48,31 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   }
 
   Future<void> _navigateAfterDelay() async {
+    // Wait for splash animation
     await Future.delayed(const Duration(seconds: 2));
-    if (!mounted) return;
+    if (!mounted || _hasNavigated) return;
 
-    // Check authentication status and fetch profile
-    await ref.read(authProvider.notifier).checkAuthStatus();
+    developer.log('SplashScreen: Starting auth check', name: 'Auth');
 
-    if (!mounted) return;
+    try {
+      // Check authentication status and fetch profile
+      await ref.read(authProvider.notifier).checkAuthStatus();
+    } catch (e) {
+      developer.log('SplashScreen: checkAuthStatus exception - $e', name: 'Auth');
+    }
+
+    if (!mounted || _hasNavigated) return;
 
     final authState = ref.read(authProvider);
     final isLoggedIn = authState.isAuthenticated;
     final isAdmin = authState.role == 'admin';
+    final role = authState.role ?? 'unknown';
 
-    developer.log('SplashScreen: isLoggedIn=$isLoggedIn, isAdmin=$isAdmin', name: 'Auth');
+    developer.log('SplashScreen: Auth complete - isLoggedIn=$isLoggedIn, isAdmin=$isAdmin, role=$role', name: 'Auth');
 
+    // Always navigate, even if not authenticated
     if (isLoggedIn) {
-      // Route based on role
+      _hasNavigated = true;
       if (isAdmin) {
         developer.log('SplashScreen: Navigating to Admin Dashboard', name: 'Auth');
         context.go(AppRoutes.admin);
@@ -71,6 +81,8 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
         context.go(AppRoutes.home);
       }
     } else {
+      _hasNavigated = true;
+      developer.log('SplashScreen: Navigating to Login', name: 'Auth');
       context.go(AppRoutes.login);
     }
   }

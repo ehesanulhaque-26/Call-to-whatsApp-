@@ -31,15 +31,22 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Future<void> _onLogin() async {
     if (!_formKey.currentState!.validate()) return;
 
+    developer.log('LoginScreen: Starting login', name: 'Auth');
+
     final result = await ref.read(authProvider.notifier).login(
           email: _emailController.text.trim(),
           password: _passwordController.text,
         );
 
-    if (!mounted) return;
+    if (!mounted) {
+      developer.log('LoginScreen: Widget unmounted, skipping navigation', name: 'Auth');
+      return;
+    }
 
-    if (result) {
-      final authState = ref.read(authProvider);
+    final authState = ref.read(authProvider);
+    developer.log('LoginScreen: Login result=$result, isAuthenticated=${authState.isAuthenticated}, role=${authState.role}', name: 'Auth');
+
+    if (result && authState.isAuthenticated) {
       final isAdmin = authState.role == 'admin';
 
       developer.log('LoginScreen: Login successful, isAdmin=$isAdmin', name: 'Auth');
@@ -53,7 +60,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         context.go(AppRoutes.home);
       }
     } else {
-      final error = ref.read(authProvider).error;
+      developer.log('LoginScreen: Login failed, error=${authState.error}', name: 'Auth');
+      final error = authState.error;
       if (error != null) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

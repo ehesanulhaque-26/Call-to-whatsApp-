@@ -16,34 +16,41 @@ class AuthNotifier extends StateNotifier<AuthState> {
     developer.log('AuthNotifier: checkAuthStatus called', name: 'Auth');
 
     final user = _supabaseService.currentUser;
+    developer.log('AuthNotifier: currentUser = ${user?.id ?? 'null'}', name: 'Auth');
+    
     if (user != null) {
-      developer.log('AuthNotifier: User authenticated - userId=${user.id}', name: 'Auth');
+      developer.log('AuthNotifier: User authenticated - userId=${user.id}, email=${user.email}', name: 'Auth');
 
-      // Try to get current user profile from Supabase
+      // Get current user profile from Supabase
       final userProfile = await _repository.getCurrentUser();
+      
       if (userProfile != null) {
-        developer.log('AuthNotifier: Profile fetched - role=${userProfile.role}', name: 'Auth');
+        developer.log('AuthNotifier: Profile fetched - role=${userProfile.role}, name=${userProfile.name}', name: 'Auth');
 
-        state = state.copyWith(
+        state = AuthState(
           isAuthenticated: true,
           userId: user.id,
           email: userProfile.email,
           name: userProfile.name,
           role: userProfile.role,
         );
+        
+        developer.log('AuthNotifier: AuthState updated - isAuthenticated=${state.isAuthenticated}, role=${state.role}', name: 'Auth');
       } else {
-        developer.log('AuthNotifier: No profile found, using auth user data', name: 'Auth');
+        developer.log('AuthNotifier: getCurrentUser returned null - using auth user data', name: 'Auth');
 
-        state = state.copyWith(
+        state = AuthState(
           isAuthenticated: true,
           userId: user.id,
-          email: user.email,
+          email: user.email ?? '',
           name: user.userMetadata?['name'] ?? '',
-          role: 'user', // Default if no profile
+          role: 'user',
         );
+        
+        developer.log('AuthNotifier: AuthState updated with defaults - role=${state.role}', name: 'Auth');
       }
     } else {
-      developer.log('AuthNotifier: No authenticated user', name: 'Auth');
+      developer.log('AuthNotifier: No authenticated user in Supabase', name: 'Auth');
     }
   }
 
@@ -52,15 +59,16 @@ class AuthNotifier extends StateNotifier<AuthState> {
     required String email,
     required String password,
   }) async {
+    developer.log('AuthNotifier: Login started for $email', name: 'Auth');
     state = state.copyWith(isLoading: true, error: null);
 
     try {
-      developer.log('AuthNotifier: Login attempt for $email', name: 'Auth');
-
       final response = await _repository.login(
         email: email,
         password: password,
       );
+
+      developer.log('AuthNotifier: Repository response - success=${response.success}, userId=${response.userId}', name: 'Auth');
 
       if (response.success && response.userId != null) {
         developer.log('AuthNotifier: Login successful - userId=${response.userId}, role=${response.role}', name: 'Auth');
@@ -68,12 +76,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
         state = AuthState(
           isAuthenticated: true,
           userId: response.userId,
-          email: response.email,
-          name: response.name,
+          email: response.email ?? '',
+          name: response.name ?? '',
           role: response.role ?? 'user',
         );
 
-        developer.log('AuthNotifier: State updated - isAdmin=${response.role == 'admin'}', name: 'Auth');
+        developer.log('AuthNotifier: AuthState after login - isAuthenticated=${state.isAuthenticated}, role=${state.role}', name: 'Auth');
         return true;
       } else {
         developer.log('AuthNotifier: Login failed - ${response.error}', name: 'Auth');
@@ -83,8 +91,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
         );
         return false;
       }
-    } catch (e) {
-      developer.log('AuthNotifier: Login exception - $e', name: 'Auth');
+    } catch (e, stackTrace) {
+      developer.log('AuthNotifier: Login exception - $e\n$stackTrace', name: 'Auth');
       state = state.copyWith(
         isLoading: false,
         error: e.toString(),
