@@ -19,6 +19,9 @@ class SupabaseService {
   Future<void> init() async {
     if (_initialized) return;
 
+    // Validate environment configuration before initialization
+    Env.validate();
+
     await Supabase.initialize(
       url: Env.supabaseUrl,
       anonKey: Env.supabaseAnonKey,

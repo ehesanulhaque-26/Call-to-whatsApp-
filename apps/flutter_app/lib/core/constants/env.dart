@@ -1,5 +1,5 @@
 /// Environment configuration for the Flutter app.
-/// All secrets and configuration are read from environment variables.
+/// All secrets and configuration are read from environment variables via --dart-define.
 class Env {
   Env._();
 
@@ -10,12 +10,14 @@ class Env {
   );
 
   /// Supabase URL - Read from environment variable
+  /// Required for Supabase initialization
   static const String supabaseUrl = String.fromEnvironment(
     'SUPABASE_URL',
     defaultValue: '',
   );
 
   /// Supabase Anonymous Key - Read from environment variable
+  /// Required for Supabase initialization
   static const String supabaseAnonKey = String.fromEnvironment(
     'SUPABASE_ANON_KEY',
     defaultValue: '',
@@ -32,5 +34,17 @@ class Env {
 
   /// Validate environment configuration
   static bool get isConfigured =>
-      apiBaseUrl.isNotEmpty && supabaseUrl.isNotEmpty && supabaseAnonKey.isNotEmpty;
+      supabaseUrl.isNotEmpty && supabaseAnonKey.isNotEmpty;
+
+  /// Validate and throw if not configured (call at app startup)
+  static void validate() {
+    if (supabaseUrl.isEmpty) {
+      throw Exception('SUPABASE_URL is not configured. '
+          'Build with --dart-define=SUPABASE_URL=your-supabase-url');
+    }
+    if (supabaseAnonKey.isEmpty) {
+      throw Exception('SUPABASE_ANON_KEY is not configured. '
+          'Build with --dart-define=SUPABASE_ANON_KEY=your-anon-key');
+    }
+  }
 }
