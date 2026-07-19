@@ -1,7 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/services/api_client.dart';
-import '../models/auth_state.dart';
 
 /// Auth repository interface
 abstract class AuthRepository {

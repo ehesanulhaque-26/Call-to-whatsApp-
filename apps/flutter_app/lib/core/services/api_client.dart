@@ -20,7 +20,7 @@ class ApiClient {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
       },
-    ));
+    ),);
 
     _dio.interceptors.add(InterceptorsWrapper(
       onRequest: (options, handler) async {
@@ -33,7 +33,7 @@ class ApiClient {
       onError: (error, handler) {
         return handler.next(error);
       },
-    ));
+    ),);
   }
 
   /// Get Dio instance for custom operations

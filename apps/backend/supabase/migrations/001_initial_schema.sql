@@ -321,7 +321,143 @@ CREATE POLICY "Admins can update all users"
         )
     );
 
--- Add remaining RLS policies similarly...
+-- Profiles policies
+CREATE POLICY "Users can view their own profile"
+    ON profiles FOR SELECT
+    USING (user_id = auth.uid());
+
+CREATE POLICY "Users can update their own profile"
+    ON profiles FOR UPDATE
+    USING (user_id = auth.uid());
+
+CREATE POLICY "Users can insert their own profile"
+    ON profiles FOR INSERT
+    WITH CHECK (user_id = auth.uid());
+
+-- Subscriptions policies
+CREATE POLICY "Users can view their own subscriptions"
+    ON subscriptions FOR SELECT
+    USING (user_id = auth.uid());
+
+CREATE POLICY "Users can insert their own subscriptions"
+    ON subscriptions FOR INSERT
+    WITH CHECK (user_id = auth.uid());
+
+CREATE POLICY "Users can update their own subscriptions"
+    ON subscriptions FOR UPDATE
+    USING (user_id = auth.uid());
+
+-- Sessions policies
+CREATE POLICY "Users can view their own sessions"
+    ON sessions FOR SELECT
+    USING (user_id = auth.uid());
+
+CREATE POLICY "Users can insert their own sessions"
+    ON sessions FOR INSERT
+    WITH CHECK (user_id = auth.uid());
+
+CREATE POLICY "Users can update their own sessions"
+    ON sessions FOR UPDATE
+    USING (user_id = auth.uid());
+
+CREATE POLICY "Users can delete their own sessions"
+    ON sessions FOR DELETE
+    USING (user_id = auth.uid());
+
+-- Automations policies
+CREATE POLICY "Users can view their own automations"
+    ON automations FOR SELECT
+    USING (user_id = auth.uid());
+
+CREATE POLICY "Users can insert their own automations"
+    ON automations FOR INSERT
+    WITH CHECK (user_id = auth.uid());
+
+CREATE POLICY "Users can update their own automations"
+    ON automations FOR UPDATE
+    USING (user_id = auth.uid());
+
+CREATE POLICY "Users can delete their own automations"
+    ON automations FOR DELETE
+    USING (user_id = auth.uid());
+
+-- Campaigns policies
+CREATE POLICY "Users can view their own campaigns"
+    ON campaigns FOR SELECT
+    USING (user_id = auth.uid());
+
+CREATE POLICY "Users can insert their own campaigns"
+    ON campaigns FOR INSERT
+    WITH CHECK (user_id = auth.uid());
+
+CREATE POLICY "Users can update their own campaigns"
+    ON campaigns FOR UPDATE
+    USING (user_id = auth.uid());
+
+CREATE POLICY "Users can delete their own campaigns"
+    ON campaigns FOR DELETE
+    USING (user_id = auth.uid());
+
+-- Contacts policies
+CREATE POLICY "Users can view their own contacts"
+    ON contacts FOR SELECT
+    USING (user_id = auth.uid());
+
+CREATE POLICY "Users can insert their own contacts"
+    ON contacts FOR INSERT
+    WITH CHECK (user_id = auth.uid());
+
+CREATE POLICY "Users can update their own contacts"
+    ON contacts FOR UPDATE
+    USING (user_id = auth.uid());
+
+CREATE POLICY "Users can delete their own contacts"
+    ON contacts FOR DELETE
+    USING (user_id = auth.uid());
+
+-- Notifications policies
+CREATE POLICY "Users can view their own notifications"
+    ON notifications FOR SELECT
+    USING (user_id = auth.uid());
+
+CREATE POLICY "Users can update their own notifications"
+    ON notifications FOR UPDATE
+    USING (user_id = auth.uid());
+
+CREATE POLICY "Users can delete their own notifications"
+    ON notifications FOR DELETE
+    USING (user_id = auth.uid());
+
+-- Activity logs policies
+CREATE POLICY "Users can view their own activity logs"
+    ON activity_logs FOR SELECT
+    USING (user_id = auth.uid());
+
+CREATE POLICY "Admins can view all activity logs"
+    ON activity_logs FOR SELECT
+    USING (
+        EXISTS (
+            SELECT 1 FROM users
+            WHERE id = auth.uid() AND role = 'admin' AND deleted_at IS NULL
+        )
+    );
+
+-- Settings policies
+CREATE POLICY "Users can view their own settings"
+    ON settings FOR SELECT
+    USING (user_id = auth.uid());
+
+CREATE POLICY "Users can insert their own settings"
+    ON settings FOR INSERT
+    WITH CHECK (user_id = auth.uid());
+
+CREATE POLICY "Users can update their own settings"
+    ON settings FOR UPDATE
+    USING (user_id = auth.uid());
+
+CREATE POLICY "Users can delete their own settings"
+    ON settings FOR DELETE
+    USING (user_id = auth.uid());
 
 -- ============================================
 -- SEED DATA

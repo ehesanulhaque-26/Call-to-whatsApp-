@@ -40,9 +40,7 @@ export class AuthController {
     status: 200,
     description: 'Password reset email sent if account exists',
   })
-  async forgotPassword(
-    @Body() forgotPasswordDto: ForgotPasswordDto,
-  ): Promise<{ message: string }> {
+  async forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto): Promise<{ message: string }> {
     await this.authService.forgotPassword(forgotPasswordDto.email);
     return {
       message: 'If an account exists with this email, a password reset link has been sent.',

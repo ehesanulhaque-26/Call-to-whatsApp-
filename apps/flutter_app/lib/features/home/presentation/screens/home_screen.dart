@@ -179,7 +179,7 @@ class HomeScreen extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: AppSpacing.md),
-            Row(
+            const Row(
               children: [
                 Expanded(
                   child: _StatCard(
@@ -189,7 +189,7 @@ class HomeScreen extends ConsumerWidget {
                     color: AppColors.info,
                   ),
                 ),
-                const SizedBox(width: AppSpacing.md),
+                SizedBox(width: AppSpacing.md),
                 Expanded(
                   child: _StatCard(
                     icon: Icons.people_outline,
@@ -201,7 +201,7 @@ class HomeScreen extends ConsumerWidget {
               ],
             ),
             const SizedBox(height: AppSpacing.md),
-            Row(
+            const Row(
               children: [
                 Expanded(
                   child: _StatCard(
@@ -211,7 +211,7 @@ class HomeScreen extends ConsumerWidget {
                     color: AppColors.primary,
                   ),
                 ),
-                const SizedBox(width: AppSpacing.md),
+                SizedBox(width: AppSpacing.md),
                 Expanded(
                   child: _StatCard(
                     icon: Icons.auto_awesome_outlined,
@@ -266,21 +266,21 @@ class HomeScreen extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: AppSpacing.md),
-            _FeatureCard(
+            const _FeatureCard(
               icon: Icons.auto_awesome,
               title: 'Automations',
               description: 'Create automated message workflows',
               isComing: true,
             ),
             const SizedBox(height: AppSpacing.sm),
-            _FeatureCard(
+            const _FeatureCard(
               icon: Icons.campaign,
               title: 'Campaigns',
               description: 'Send bulk messages to contacts',
               isComing: true,
             ),
             const SizedBox(height: AppSpacing.sm),
-            _FeatureCard(
+            const _FeatureCard(
               icon: Icons.analytics,
               title: 'Analytics',
               description: 'Track your message performance',

@@ -41,10 +41,7 @@ export class UsersController {
     status: 200,
     description: 'User updated successfully',
   })
-  async updateMe(
-    @CurrentUser() user: CurrentUserPayload,
-    @Body() updateUserDto: UpdateUserDto,
-  ) {
+  async updateMe(@CurrentUser() user: CurrentUserPayload, @Body() updateUserDto: UpdateUserDto) {
     return this.usersService.update(user.userId, updateUserDto);
   }
 

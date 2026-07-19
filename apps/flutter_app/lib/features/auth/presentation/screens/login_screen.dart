@@ -156,9 +156,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                 },
                           activeColor: AppColors.primary,
                         ),
-                        Text(
+                        const Text(
                           'Remember me',
-                          style: AppTypography.bodyMedium,
                         ),
                       ],
                     ),

@@ -7,9 +7,9 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  
+
   const configService = app.get(ConfigService);
-  
+
   // Enable CORS
   app.enableCors({
     origin: true,
@@ -45,13 +45,13 @@ async function bootstrap() {
     .addTag('health', 'Health check endpoints')
     .addTag('openwa', 'OpenWA integration endpoints')
     .build();
-  
+
   const document = SwaggerModule.createDocument(app, swaggerConfig);
   SwaggerModule.setup('docs', app, document);
 
   const port = configService.get<number>('PORT', 3000);
   await app.listen(port);
-  
+
   console.log(`Application is running on: http://localhost:${port}`);
   console.log(`Swagger documentation: http://localhost:${port}/docs`);
 }

@@ -1,8 +1,17 @@
-import { Controller, Get, Post, Delete, Param, Body, Query, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Delete,
+  Param,
+  Body,
+  UseGuards,
+  HttpCode,
+  HttpStatus,
+} from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { ApiBearerAuth, ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { OpenWAService } from './openwa.service';
-import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
 
 @ApiTags('openwa')
@@ -140,10 +149,7 @@ export class OpenWAController {
   @ApiParam({ name: 'sessionId', description: 'Session ID' })
   @ApiParam({ name: 'contactId', description: 'Contact ID' })
   @ApiResponse({ status: 200, description: 'Contact details' })
-  async getContact(
-    @Param('sessionId') sessionId: string,
-    @Param('contactId') contactId: string,
-  ) {
+  async getContact(@Param('sessionId') sessionId: string, @Param('contactId') contactId: string) {
     return this.openWAService.getContact(sessionId, contactId);
   }
 
@@ -161,10 +167,7 @@ export class OpenWAController {
   @ApiParam({ name: 'sessionId', description: 'Session ID' })
   @ApiParam({ name: 'groupId', description: 'Group ID' })
   @ApiResponse({ status: 200, description: 'Group details' })
-  async getGroup(
-    @Param('sessionId') sessionId: string,
-    @Param('groupId') groupId: string,
-  ) {
+  async getGroup(@Param('sessionId') sessionId: string, @Param('groupId') groupId: string) {
     return this.openWAService.getGroup(sessionId, groupId);
   }
 

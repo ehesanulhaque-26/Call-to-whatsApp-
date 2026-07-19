@@ -19,7 +19,7 @@ export class UsersService {
 
   async findByEmail(email: string): Promise<User | null> {
     const { data, error } = await this.supabaseService.query<User>('users', {
-      eq: { email, 'deleted_at': 'null' },
+      eq: { email, deleted_at: 'null' },
       limit: 1,
     });
 
@@ -40,7 +40,7 @@ export class UsersService {
     const offset = (page - 1) * limit;
 
     const queryOptions: Parameters<typeof this.supabaseService.query>[1] = {
-      eq: { 'deleted_at': 'null' },
+      eq: { deleted_at: 'null' },
       order: [{ column: 'created_at', ascending: false }],
       range: { from: offset, to: offset + limit - 1 },
     };
@@ -56,13 +56,10 @@ export class UsersService {
     }
 
     // Get total count
-    const { data: countData } = await this.supabaseService.query<{ count: number }>(
-      'users',
-      {
-        eq: { 'deleted_at': 'null' },
-        select: 'id',
-      },
-    );
+    const { data: countData } = await this.supabaseService.query<{ count: number }>('users', {
+      eq: { deleted_at: 'null' },
+      select: 'id',
+    });
 
     const total = countData?.length || 0;
 

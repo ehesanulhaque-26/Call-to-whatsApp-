@@ -1,17 +1,37 @@
 import { Injectable, Inject, Logger } from '@nestjs/common';
 import { SupabaseClient } from '@supabase/supabase-js';
 
+export type SupabaseClientType = 'anon' | 'service';
+
 @Injectable()
 export class SupabaseService {
   private readonly logger = new Logger(SupabaseService.name);
-  private readonly _client: SupabaseClient;
+  private readonly _anonClient: SupabaseClient;
+  private readonly _serviceClient: SupabaseClient;
 
-  constructor(@Inject('SUPABASE_CLIENT') client: SupabaseClient) {
-    this._client = client;
+  constructor(
+    @Inject('SUPABASE_ANON_CLIENT') anonClient: SupabaseClient,
+    @Inject('SUPABASE_SERVICE_CLIENT') serviceClient: SupabaseClient,
+  ) {
+    this._anonClient = anonClient;
+    this._serviceClient = serviceClient;
   }
 
+  /**
+   * Get the appropriate client based on type
+   * - 'anon': User-scoped operations (respects RLS policies)
+   * - 'service': Admin operations (bypasses RLS policies)
+   */
+  getClient(type: SupabaseClientType = 'service'): SupabaseClient {
+    return type === 'anon' ? this._anonClient : this._serviceClient;
+  }
+
+  /**
+   * Get the default client (service role - bypasses RLS)
+   * @deprecated Use getClient() instead
+   */
   get client(): SupabaseClient {
-    return this._client;
+    return this._serviceClient;
   }
 
   async query<T>(
@@ -132,11 +152,7 @@ export class SupabaseService {
 
   async findById<T>(table: string, id: string): Promise<{ data: T | null; error: Error | null }> {
     try {
-      const { data, error } = await this.client
-        .from(table)
-        .select('*')
-        .eq('id', id)
-        .single();
+      const { data, error } = await this.client.from(table).select('*').eq('id', id).single();
 
       if (error) {
         return { data: null, error };
@@ -206,15 +222,9 @@ export class SupabaseService {
     }
   }
 
-  async delete(
-    table: string,
-    id: string,
-  ): Promise<{ success: boolean; error: Error | null }> {
+  async delete(table: string, id: string): Promise<{ success: boolean; error: Error | null }> {
     try {
-      const { error } = await this.client
-        .from(table)
-        .delete()
-        .eq('id', id);
+      const { error } = await this.client.from(table).delete().eq('id', id);
 
       if (error) {
         this.logger.error(`Delete error on ${table}: ${error.message}`);

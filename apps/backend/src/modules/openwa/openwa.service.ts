@@ -32,7 +32,7 @@ export class OpenWAService {
 
   constructor(private readonly configService: ConfigService) {
     const baseURL = this.configService.get<string>('OPENWA_URL');
-    
+
     if (!baseURL) {
       this.logger.warn('OPENWA_URL not configured - OpenWA service will not be available');
     }
@@ -56,10 +56,7 @@ export class OpenWAService {
       return response.data;
     } catch (error) {
       this.logger.error(`OpenWA API error: ${method} ${path}`, error);
-      throw new HttpException(
-        'Failed to communicate with OpenWA server',
-        HttpStatus.BAD_GATEWAY,
-      );
+      throw new HttpException('Failed to communicate with OpenWA server', HttpStatus.BAD_GATEWAY);
     }
   }
 
@@ -99,7 +96,11 @@ export class OpenWAService {
   }
 
   // Messaging
-  async sendTextMessage(sessionId: string, to: string, text: string): Promise<OpenWASendMessageResult> {
+  async sendTextMessage(
+    sessionId: string,
+    to: string,
+    text: string,
+  ): Promise<OpenWASendMessageResult> {
     return this.request<OpenWASendMessageResult>('POST', `/sessions/${sessionId}/send-text`, {
       to,
       text,
@@ -113,16 +114,12 @@ export class OpenWAService {
     caption?: string,
     mimetype?: string,
   ): Promise<OpenWASendMessageResult> {
-    return this.request<OpenWASendMessageResult>(
-      'POST',
-      `/sessions/${sessionId}/send-media`,
-      {
-        to,
-        mediaUrl,
-        caption,
-        mimetype,
-      },
-    );
+    return this.request<OpenWASendMessageResult>('POST', `/sessions/${sessionId}/send-media`, {
+      to,
+      mediaUrl,
+      caption,
+      mimetype,
+    });
   }
 
   // Chats & Contacts
@@ -158,14 +155,10 @@ export class OpenWAService {
     templateName: string,
     templateData?: Record<string, string>,
   ): Promise<OpenWASendMessageResult> {
-    return this.request<OpenWASendMessageResult>(
-      'POST',
-      `/sessions/${sessionId}/send-template`,
-      {
-        to,
-        templateName,
-        templateData,
-      },
-    );
+    return this.request<OpenWASendMessageResult>('POST', `/sessions/${sessionId}/send-template`, {
+      to,
+      templateName,
+      templateData,
+    });
   }
 }

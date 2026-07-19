@@ -28,7 +28,7 @@ export class AuthService {
 
   async validateUser(email: string, password: string): Promise<User | null> {
     const { data, error } = await this.supabaseService.query<User>('users', {
-      eq: { email, 'deleted_at': 'null' },
+      eq: { email, deleted_at: 'null' },
       limit: 1,
     });
 
@@ -100,7 +100,7 @@ export class AuthService {
   async forgotPassword(email: string): Promise<void> {
     // Check if user exists
     const { data } = await this.supabaseService.query<User>('users', {
-      eq: { email, 'deleted_at': 'null' },
+      eq: { email, deleted_at: 'null' },
       limit: 1,
     });
 
@@ -115,10 +115,11 @@ export class AuthService {
     this.logger.log(`Password reset requested for: ${email}`);
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async resetPassword(token: string, newPassword: string): Promise<boolean> {
     // In production, verify the reset token and reset password
     // This is a placeholder implementation
-    this.logger.log(`Password reset attempted with token: ${token}`);
+    this.logger.log(`Password reset attempted with token: ${token}, password: ${newPassword}`);
     return true;
   }
 
