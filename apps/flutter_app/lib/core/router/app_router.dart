@@ -1,6 +1,8 @@
+import 'dart:developer' as developer;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../features/auth/presentation/providers/auth_provider.dart';
 import '../../features/auth/presentation/screens/splash_screen.dart';
 import '../../features/auth/presentation/screens/login_screen.dart';
 import '../../features/auth/presentation/screens/register_screen.dart';
@@ -13,7 +15,6 @@ import '../../features/admin/presentation/screens/admin_dashboard_screen.dart';
 import '../../features/admin/presentation/screens/users_screen.dart';
 import '../../features/admin/presentation/screens/subscriptions_screen.dart';
 import '../services/supabase_service.dart';
-// import '../theme/app_tokens.dart';
 
 class AppRoutes {
   AppRoutes._();
@@ -36,6 +37,7 @@ final _shellNavigatorKey = GlobalKey<NavigatorState>();
 
 final routerProvider = Provider<GoRouter>((ref) {
   final supabaseService = ref.watch(supabaseServiceProvider);
+  final authState = ref.watch(authProvider);
 
   return GoRouter(
     navigatorKey: _rootNavigatorKey,
@@ -47,9 +49,32 @@ final routerProvider = Provider<GoRouter>((ref) {
           state.matchedLocation == AppRoutes.forgotPassword ||
           state.matchedLocation == AppRoutes.splash;
 
+      final isAdminRoute = state.matchedLocation.startsWith('/admin');
+      final isAdmin = authState.role == 'admin';
+
+      developer.log('Router: isLoggedIn=$isLoggedIn, isAdmin=$isAdmin, location=${state.matchedLocation}', name: 'Router');
+
+      // Skip redirect on splash screen
       if (state.matchedLocation == AppRoutes.splash) return null;
-      if (!isLoggedIn && !isAuthRoute) return AppRoutes.login;
-      if (isLoggedIn && isAuthRoute) return AppRoutes.home;
+
+      // Redirect unauthenticated users to login
+      if (!isLoggedIn && !isAuthRoute) {
+        developer.log('Router: Redirecting to login (unauthenticated)', name: 'Router');
+        return AppRoutes.login;
+      }
+
+      // Redirect authenticated users away from auth routes
+      if (isLoggedIn && isAuthRoute) {
+        developer.log('Router: Redirecting to home (authenticated)', name: 'Router');
+        return AppRoutes.home;
+      }
+
+      // Protect admin routes - redirect non-admins to home
+      if (isAdminRoute && !isAdmin) {
+        developer.log('Router: Blocking admin route access for non-admin', name: 'Router');
+        return AppRoutes.home;
+      }
+
       return null;
     },
     routes: [
@@ -197,7 +222,7 @@ final routerProvider = Provider<GoRouter>((ref) {
   );
 });
 
-class MainShell extends StatelessWidget {
+class MainShell extends ConsumerWidget {
   const MainShell({required this.child, super.key});
   final Widget child;
 
@@ -213,9 +238,12 @@ class MainShell extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final location = GoRouterState.of(context).matchedLocation;
     final selectedIndex = _getSelectedIndex(location);
+    final isAdmin = ref.watch(isAdminProvider);
+
+    developer.log('MainShell: isAdmin=$isAdmin, location=$location', name: 'Router');
 
     return Scaffold(
       body: child,
@@ -230,31 +258,32 @@ class MainShell extends StatelessWidget {
             case 4: context.go(AppRoutes.admin); break;
           }
         },
-        destinations: const [
-          NavigationDestination(
+        destinations: [
+          const NavigationDestination(
             icon: Icon(Icons.home_outlined),
             selectedIcon: Icon(Icons.home),
             label: 'Home',
           ),
-          NavigationDestination(
+          const NavigationDestination(
             icon: Icon(Icons.chat_bubble_outline),
             selectedIcon: Icon(Icons.chat_bubble),
             label: 'WhatsApp',
           ),
-          NavigationDestination(
+          const NavigationDestination(
             icon: Icon(Icons.auto_awesome_outlined),
             selectedIcon: Icon(Icons.auto_awesome),
             label: 'Automations',
           ),
-          NavigationDestination(
+          const NavigationDestination(
             icon: Icon(Icons.settings_outlined),
             selectedIcon: Icon(Icons.settings),
             label: 'Settings',
           ),
           NavigationDestination(
             icon: Icon(Icons.admin_panel_settings_outlined),
-            selectedIcon: Icon(Icons.admin_panel_settings),
+            selectedIcon: const Icon(Icons.admin_panel_settings),
             label: 'Admin',
+            tooltip: isAdmin ? 'Admin Dashboard' : 'Access Restricted',
           ),
         ],
       ),

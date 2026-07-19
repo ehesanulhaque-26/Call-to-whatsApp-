@@ -1,3 +1,4 @@
+import 'dart:developer' as developer;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -38,7 +39,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     if (!mounted) return;
 
     if (result) {
-      context.go(AppRoutes.home);
+      final authState = ref.read(authProvider);
+      final isAdmin = authState.role == 'admin';
+
+      developer.log('LoginScreen: Login successful, isAdmin=$isAdmin', name: 'Auth');
+
+      // Navigate based on role
+      if (isAdmin) {
+        developer.log('LoginScreen: Navigating to Admin Dashboard', name: 'Auth');
+        context.go(AppRoutes.admin);
+      } else {
+        developer.log('LoginScreen: Navigating to User Home', name: 'Auth');
+        context.go(AppRoutes.home);
+      }
     } else {
       final error = ref.read(authProvider).error;
       if (error != null) {

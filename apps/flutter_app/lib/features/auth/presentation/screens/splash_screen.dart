@@ -1,3 +1,4 @@
+import 'dart:developer' as developer;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -49,15 +50,26 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     await Future.delayed(const Duration(seconds: 2));
     if (!mounted) return;
 
-    // Check authentication status
+    // Check authentication status and fetch profile
     await ref.read(authProvider.notifier).checkAuthStatus();
 
     if (!mounted) return;
 
-    final isLoggedIn = ref.read(authProvider).isAuthenticated;
-    
+    final authState = ref.read(authProvider);
+    final isLoggedIn = authState.isAuthenticated;
+    final isAdmin = authState.role == 'admin';
+
+    developer.log('SplashScreen: isLoggedIn=$isLoggedIn, isAdmin=$isAdmin', name: 'Auth');
+
     if (isLoggedIn) {
-      context.go(AppRoutes.home);
+      // Route based on role
+      if (isAdmin) {
+        developer.log('SplashScreen: Navigating to Admin Dashboard', name: 'Auth');
+        context.go(AppRoutes.admin);
+      } else {
+        developer.log('SplashScreen: Navigating to User Home', name: 'Auth');
+        context.go(AppRoutes.home);
+      }
     } else {
       context.go(AppRoutes.login);
     }
