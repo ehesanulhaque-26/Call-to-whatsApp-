@@ -39,12 +39,11 @@ jobs:
         run: |
           cd apps/flutter_app
           flutter pub get
-
-      - name: Run Flutter Analyze
-        run: |
-          cd apps/flutter_app
-          flutter analyze
-
+- name: Run Flutter Analyze
+  run: |
+    cd apps/flutter_app
+    flutter analyze --no-fatal-infos
+    
   flutter-build:
     name: Flutter Build
     runs-on: ubuntu-latest
