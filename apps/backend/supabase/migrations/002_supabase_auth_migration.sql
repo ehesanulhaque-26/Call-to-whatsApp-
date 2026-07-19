@@ -167,13 +167,16 @@ CREATE TABLE settings (
 -- SECTION 3: All Indexes
 -- ============================================
 
--- Profiles indexes
-CREATE INDEX idx_profiles_user_id ON profiles(user_id);
+-- Profiles indexes (id is already PK, no extra index needed)
 CREATE INDEX idx_profiles_role ON profiles(role);
+CREATE INDEX idx_profiles_subscription_plan ON profiles(subscription_plan);
+CREATE INDEX idx_profiles_subscription_status ON profiles(subscription_status);
+CREATE INDEX idx_profiles_subscription_expires_at ON profiles(subscription_expires_at);
 
 -- Subscriptions indexes
 CREATE INDEX idx_subscriptions_user_id ON subscriptions(user_id);
 CREATE INDEX idx_subscriptions_status ON subscriptions(status);
+CREATE INDEX idx_subscriptions_expires_at ON subscriptions(expires_at);
 
 -- Sessions indexes
 CREATE INDEX idx_sessions_user_id ON sessions(user_id);
@@ -255,10 +258,9 @@ ALTER TABLE settings ENABLE ROW LEVEL SECURITY;
 -- SECTION 7: All Policies (after RLS enabled)
 -- ============================================
 
--- Profiles policies
+-- Profiles policies (INSERT is handled by trigger, no direct INSERT allowed)
 CREATE POLICY "Users can view their own profile" ON profiles FOR SELECT USING (auth.uid() = id);
 CREATE POLICY "Users can update their own profile" ON profiles FOR UPDATE USING (auth.uid() = id);
-CREATE POLICY "Users can insert their own profile" ON profiles FOR INSERT WITH CHECK (auth.uid() = id);
 
 -- Subscriptions policies
 CREATE POLICY "Users can view their own subscriptions" ON subscriptions FOR SELECT USING (user_id = auth.uid());
@@ -316,7 +318,8 @@ BEGIN
         NEW.id,
         COALESCE(NEW.raw_user_meta_data->>'name', ''),
         'user'
-    );
+    )
+    ON CONFLICT (id) DO NOTHING;
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
