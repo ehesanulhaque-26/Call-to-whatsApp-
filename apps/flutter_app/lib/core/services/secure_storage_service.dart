@@ -19,6 +19,7 @@ class SecureStorageService {
   static const _keyAccessToken = 'access_token';
   static const _keyRefreshToken = 'refresh_token';
   static const _keyUserId = 'user_id';
+  static const _keyWhatsAppSessionId = 'whatsapp_session_id';
 
   /// Save access token
   Future<void> saveAccessToken(String token) async {
@@ -59,6 +60,21 @@ class SecureStorageService {
   Future<bool> hasValidSession() async {
     final token = await getAccessToken();
     return token != null && token.isNotEmpty;
+  }
+
+  /// Save WhatsApp session ID
+  Future<void> saveWhatsAppSessionId(String sessionId) async {
+    await _storage.write(key: _keyWhatsAppSessionId, value: sessionId);
+  }
+
+  /// Get WhatsApp session ID
+  String? getWhatsAppSessionId() {
+    return _storage.read(key: _keyWhatsAppSessionId) as String?;
+  }
+
+  /// Clear WhatsApp session ID
+  Future<void> clearWhatsAppSessionId() async {
+    await _storage.delete(key: _keyWhatsAppSessionId);
   }
 }
 

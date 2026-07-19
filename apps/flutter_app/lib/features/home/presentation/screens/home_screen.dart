@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/theme/app_tokens.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../whatsapp/presentation/providers/whatsapp_provider.dart';
+import '../../../whatsapp/data/models/whatsapp_connection.dart';
 
 /// Home screen - main app shell
 class HomeScreen extends ConsumerWidget {
@@ -223,42 +225,230 @@ class HomeScreen extends ConsumerWidget {
               ],
             ),
             const SizedBox(height: AppSpacing.lg),
-            // OpenWA Connection status
+            // WhatsApp Connection Status
+            Consumer(
+              builder: (context, ref, _) {
+                final whatsAppState = ref.watch(whatsAppProvider);
+                final connection = whatsAppState.connection;
+                final isConnected = connection?.state == WhatsAppConnectionState.connected;
+                final isLoading = whatsAppState.isLoading;
+
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'WhatsApp Status',
+                      style: AppTypography.titleMedium.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    Card(
+                      child: InkWell(
+                        onTap: () => context.go(AppRoutes.whatsApp),
+                        borderRadius: BorderRadius.circular(AppRadius.xl),
+                        child: Padding(
+                          padding: const EdgeInsets.all(AppSpacing.md),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 48,
+                                height: 48,
+                                decoration: BoxDecoration(
+                                  color: isConnected
+                                      ? AppColors.success.withOpacity(0.1)
+                                      : AppColors.textTertiary.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(AppRadius.md),
+                                ),
+                                child: Icon(
+                                  isConnected ? Icons.check_circle : Icons.qr_code,
+                                  color: isConnected ? AppColors.success : AppColors.textTertiary,
+                                ),
+                              ),
+                              const SizedBox(width: AppSpacing.md),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      isConnected
+                                          ? connection?.name ?? 'WhatsApp Connected'
+                                          : 'Not Connected',
+                                      style: AppTypography.titleSmall.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    Text(
+                                      isConnected
+                                          ? connection?.phone ?? 'Connected'
+                                          : 'Tap to connect your WhatsApp',
+                                      style: AppTypography.bodySmall.copyWith(
+                                        color: AppColors.textSecondary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              if (isConnected) ...[
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: AppSpacing.sm,
+                                    vertical: AppSpacing.xs,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.success.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(AppRadius.full),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Container(
+                                        width: 8,
+                                        height: 8,
+                                        decoration: const BoxDecoration(
+                                          color: AppColors.success,
+                                          shape: BoxShape.circle,
+                                        ),
+                                      ),
+                                      const SizedBox(width: AppSpacing.xs),
+                                      Text(
+                                        'Connected',
+                                        style: AppTypography.labelSmall.copyWith(
+                                          color: AppColors.success,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ] else ...[
+                                ElevatedButton(
+                                  onPressed: isLoading
+                                      ? null
+                                      : () => context.go(AppRoutes.whatsApp),
+                                  style: ElevatedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: AppSpacing.md,
+                                      vertical: AppSpacing.xs,
+                                    ),
+                                  ),
+                                  child: Text(isLoading ? 'Loading...' : 'Connect'),
+                                ),
+                              ],
+                              const SizedBox(width: AppSpacing.sm),
+                              const Icon(Icons.chevron_right, color: AppColors.textTertiary),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    // Connection Activity
+                    if (connection?.lastConnected != null)
+                      Card(
+                        child: ListTile(
+                          leading: Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: AppColors.info.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(AppRadius.md),
+                            ),
+                            child: const Icon(
+                              Icons.history,
+                              color: AppColors.info,
+                            ),
+                          ),
+                          title: const Text('Last Connected'),
+                          subtitle: Text(
+                            _formatLastConnected(connection!.lastConnected!),
+                            style: AppTypography.bodySmall.copyWith(
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                );
+              },
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            // OpenWA Server Status
             Text(
-              'Connection Status',
+              'System Status',
               style: AppTypography.titleMedium.copyWith(
                 fontWeight: FontWeight.bold,
               ),
             ),
             const SizedBox(height: AppSpacing.md),
-            Card(
-              child: ListTile(
-                leading: Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: AppColors.success.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(AppRadius.md),
+            Consumer(
+              builder: (context, ref, _) {
+                final whatsAppState = ref.watch(whatsAppProvider);
+                final isHealthy = whatsAppState.openWAHealthy;
+
+                return Card(
+                  child: ListTile(
+                    leading: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: isHealthy
+                            ? AppColors.success.withOpacity(0.1)
+                            : AppColors.error.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(AppRadius.md),
+                      ),
+                      child: Icon(
+                        isHealthy ? Icons.cloud_done_outlined : Icons.cloud_off_outlined,
+                        color: isHealthy ? AppColors.success : AppColors.error,
+                      ),
+                    ),
+                    title: const Text('OpenWA Server'),
+                    subtitle: Text(
+                      isHealthy ? 'Operational' : 'Unavailable',
+                      style: AppTypography.bodySmall.copyWith(
+                        color: isHealthy ? AppColors.success : AppColors.error,
+                      ),
+                    ),
+                    trailing: Container(
+                      width: 12,
+                      height: 12,
+                      decoration: BoxDecoration(
+                        color: isHealthy ? AppColors.success : AppColors.error,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
                   ),
-                  child: const Icon(
-                    Icons.cloud_done_outlined,
-                    color: AppColors.success,
-                  ),
-                ),
-                title: const Text('OpenWA Server'),
-                subtitle: const Text('Connected'),
-                trailing: Container(
-                  width: 12,
-                  height: 12,
-                  decoration: const BoxDecoration(
-                    color: AppColors.success,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-              ),
+                );
+              },
             ),
             const SizedBox(height: AppSpacing.lg),
-            // Coming soon features (Phase 2)
+            // Quick Actions
+            Text(
+              'Quick Actions',
+              style: AppTypography.titleMedium.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            _FeatureCard(
+              icon: Icons.chat_bubble,
+              title: 'WhatsApp Connection',
+              description: 'Manage your WhatsApp connection',
+              onTap: () => context.go(AppRoutes.whatsApp),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            _FeatureCard(
+              icon: Icons.auto_awesome,
+              title: 'Automations',
+              description: 'Create automated message workflows',
+              isComing: true,
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            _FeatureCard(
+              icon: Icons.campaign,
+              title: 'Campaigns',
+              description: 'Send bulk messages to contacts',
+              isComing: true,
+            ),
             Text(
               'Coming Soon',
               style: AppTypography.titleMedium.copyWith(
@@ -369,18 +559,21 @@ class _FeatureCard extends StatelessWidget {
     required this.icon,
     required this.title,
     required this.description,
-    required this.isComing,
+    this.isComing = false,
+    this.onTap,
   });
 
   final IconData icon;
   final String title;
   final String description;
   final bool isComing;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     return Card(
       child: ListTile(
+        onTap: onTap,
         leading: Container(
           width: 40,
           height: 40,
@@ -417,8 +610,28 @@ class _FeatureCard extends StatelessWidget {
                   ),
                 ),
               )
-            : null,
+            : onTap != null
+                ? const Icon(Icons.chevron_right, color: AppColors.textTertiary)
+                : null,
       ),
     );
+  }
+}
+
+/// Format last connected time
+String _formatLastConnected(DateTime dateTime) {
+  final now = DateTime.now();
+  final difference = now.difference(dateTime);
+
+  if (difference.inMinutes < 1) {
+    return 'Just now';
+  } else if (difference.inMinutes < 60) {
+    return '${difference.inMinutes} minute${difference.inMinutes > 1 ? 's' : ''} ago';
+  } else if (difference.inHours < 24) {
+    return '${difference.inHours} hour${difference.inHours > 1 ? 's' : ''} ago';
+  } else if (difference.inDays < 7) {
+    return '${difference.inDays} day${difference.inDays > 1 ? 's' : ''} ago';
+  } else {
+    return '${dateTime.day}/${dateTime.month}/${dateTime.year}';
   }
 }

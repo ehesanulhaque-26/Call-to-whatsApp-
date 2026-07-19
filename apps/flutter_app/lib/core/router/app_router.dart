@@ -6,7 +6,7 @@ import '../../features/auth/presentation/screens/login_screen.dart';
 import '../../features/auth/presentation/screens/register_screen.dart';
 import '../../features/auth/presentation/screens/forgot_password_screen.dart';
 import '../../features/home/presentation/screens/home_screen.dart';
-import '../../features/sessions/presentation/screens/sessions_screen.dart';
+import '../../features/whatsapp/presentation/screens/whatsapp_screen.dart';
 import '../../features/automations/presentation/screens/automations_screen.dart';
 import '../../features/settings/presentation/screens/settings_screen.dart';
 import '../../features/admin/presentation/screens/admin_dashboard_screen.dart';
@@ -23,7 +23,7 @@ class AppRoutes {
   static const String register = '/register';
   static const String forgotPassword = '/forgot-password';
   static const String home = '/home';
-  static const String sessions = '/sessions';
+  static const String whatsApp = '/whatsapp';
   static const String automations = '/automations';
   static const String settings = '/settings';
   static const String admin = '/admin';
@@ -107,11 +107,11 @@ final routerProvider = Provider<GoRouter>((ref) {
             ),
           ),
           GoRoute(
-            path: AppRoutes.sessions,
-            name: 'sessions',
+            path: AppRoutes.whatsApp,
+            name: 'whatsApp',
             pageBuilder: (context, state) => CustomTransitionPage(
               key: state.pageKey,
-              child: const SessionsScreen(),
+              child: const WhatsAppScreen(),
               transitionsBuilder: (context, animation, secondaryAnimation, child) {
                 return FadeTransition(opacity: animation, child: child);
               },
@@ -205,7 +205,7 @@ class MainShell extends StatelessWidget {
     if (location.startsWith('/admin')) return 4;
     switch (location) {
       case '/home': return 0;
-      case '/sessions': return 1;
+      case '/whatsapp': return 1;
       case '/automations': return 2;
       case '/settings': return 3;
       default: return 0;
@@ -224,7 +224,7 @@ class MainShell extends StatelessWidget {
         onDestinationSelected: (index) {
           switch (index) {
             case 0: context.go(AppRoutes.home); break;
-            case 1: context.go(AppRoutes.sessions); break;
+            case 1: context.go(AppRoutes.whatsApp); break;
             case 2: context.go(AppRoutes.automations); break;
             case 3: context.go(AppRoutes.settings); break;
             case 4: context.go(AppRoutes.admin); break;
@@ -237,9 +237,9 @@ class MainShell extends StatelessWidget {
             label: 'Home',
           ),
           NavigationDestination(
-            icon: Icon(Icons.phone_android_outlined),
-            selectedIcon: Icon(Icons.phone_android),
-            label: 'Sessions',
+            icon: Icon(Icons.chat_bubble_outline),
+            selectedIcon: Icon(Icons.chat_bubble),
+            label: 'WhatsApp',
           ),
           NavigationDestination(
             icon: Icon(Icons.auto_awesome_outlined),
