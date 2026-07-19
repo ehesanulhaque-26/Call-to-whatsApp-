@@ -1,4 +1,4 @@
-import { Controller, Post, Body, HttpCode, HttpStatus, Req, UseGuards, Get } from '@nestjs/common';
+import { Controller, Get, Patch, Body, UseGuards } from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
@@ -6,12 +6,7 @@ import {
   ApiBearerAuth,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
-import { Request } from 'express';
-import { AuthService } from './auth.service';
-import { LoginDto } from './dto/login.dto';
-import { RegisterDto } from './dto/register.dto';
-import { ForgotPasswordDto } from './dto/forgot-password.dto';
-import { RefreshTokenDto } from './dto/refresh-token.dto';
+import { AuthService, Profile } from './auth.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
@@ -20,99 +15,42 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
-  @Post('login')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'User login' })
-  @ApiResponse({
-    status: 200,
-    description: 'Login successful',
-  })
-  @ApiUnauthorizedResponse({ description: 'Invalid credentials' })
-  async login(@Body() loginDto: LoginDto, @Req() req: Request) {
-    const ipAddress = req.ip || req.socket?.remoteAddress;
-    const userAgent = req.headers['user-agent'];
-
-    return this.authService.login(
-      loginDto.email,
-      loginDto.password,
-      loginDto.deviceInfo,
-      ipAddress,
-      userAgent,
-      loginDto.rememberMe,
-    );
-  }
-
-  @Post('register')
-  @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'User registration' })
-  @ApiResponse({
-    status: 201,
-    description: 'Registration successful',
-  })
-  @ApiResponse({ status: 409, description: 'Email already exists' })
-  async register(@Body() registerDto: RegisterDto): Promise<{ message: string }> {
-    await this.authService.register(registerDto);
-    return { message: 'Registration successful. Please login.' };
-  }
-
-  @Post('refresh')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Refresh access token' })
-  @ApiResponse({
-    status: 200,
-    description: 'Token refreshed successfully',
-  })
-  @ApiUnauthorizedResponse({ description: 'Invalid refresh token' })
-  async refresh(@Body() refreshTokenDto: RefreshTokenDto) {
-    return this.authService.refreshTokens(refreshTokenDto.refreshToken);
-  }
-
-  @Post('logout')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'User logout' })
-  @ApiResponse({
-    status: 200,
-    description: 'Logout successful',
-  })
-  async logout(@Body() refreshTokenDto: RefreshTokenDto): Promise<{ message: string }> {
-    await this.authService.logout(refreshTokenDto.refreshToken);
-    return { message: 'Logout successful' };
-  }
-
-  @Post('logout-all')
-  @HttpCode(HttpStatus.OK)
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Logout from all devices' })
-  @ApiResponse({
-    status: 200,
-    description: 'All sessions logged out successfully',
-  })
-  async logoutAll(@CurrentUser() user: { userId: string }): Promise<{ message: string }> {
-    await this.authService.logoutAll(user.userId);
-    return { message: 'All sessions logged out successfully' };
-  }
-
   @Get('me')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get current user' })
+  @ApiOperation({ summary: 'Get current user profile' })
   @ApiResponse({ status: 200, description: 'Current user profile' })
+  @ApiUnauthorizedResponse({ description: 'Unauthorized' })
   async getProfile(@CurrentUser() user: { userId: string }) {
-    return { userId: user.userId };
+    const profile = await this.authService.getProfile(user.userId);
+    return profile;
   }
 
-  @Post('forgot-password')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Request password reset' })
-  @ApiResponse({
-    status: 200,
-    description: 'Password reset email sent if account exists',
-  })
-  async forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto): Promise<{ message: string }> {
-    await this.authService.forgotPassword(forgotPasswordDto.email);
+  @Patch('me')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Update current user profile' })
+  @ApiResponse({ status: 200, description: 'Updated profile' })
+  @ApiUnauthorizedResponse({ description: 'Unauthorized' })
+  async updateProfile(
+    @CurrentUser() user: { userId: string },
+    @Body() updates: { name?: string; phone?: string; avatar_url?: string },
+  ): Promise<Profile> {
+    return this.authService.updateProfile(user.userId, updates);
+  }
+
+  @Get('verify')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Verify token is valid' })
+  @ApiResponse({ status: 200, description: 'Token is valid' })
+  @ApiUnauthorizedResponse({ description: 'Invalid token' })
+  async verifyToken(@CurrentUser() user: { userId: string; email: string; role: string }) {
     return {
-      message: 'If an account exists with this email, a password reset link has been sent.',
+      valid: true,
+      userId: user.userId,
+      email: user.email,
+      role: user.role,
     };
   }
 }

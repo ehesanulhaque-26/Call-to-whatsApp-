@@ -1,32 +1,33 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../../core/services/secure_storage_service.dart';
+import '../../../../core/services/supabase_service.dart';
 import '../../data/models/auth_state.dart';
 import '../../data/repositories/auth_repository.dart';
 
-/// Auth notifier for managing authentication state
+/// Auth notifier for managing authentication state using Supabase Auth
 class AuthNotifier extends StateNotifier<AuthState> {
-  AuthNotifier(this._repository, this._secureStorage) : super(const AuthState());
+  AuthNotifier(this._repository, this._supabaseService) : super(const AuthState());
 
   final AuthRepository _repository;
-  final SecureStorageService _secureStorage;
+  final SupabaseService _supabaseService;
 
   /// Check authentication status
   Future<void> checkAuthStatus() async {
-    final hasValidSession = await _secureStorage.hasValidSession();
-    if (hasValidSession) {
-      final userId = await _secureStorage.getUserId();
+    final user = _supabaseService.currentUser;
+    if (user != null) {
       state = state.copyWith(
         isAuthenticated: true,
-        userId: userId,
+        userId: user.id,
+        email: user.email,
+        name: user.userMetadata?['name'] ?? '',
       );
 
       // Try to get current user profile
-      final user = await _repository.getCurrentUser();
-      if (user != null) {
+      final userProfile = await _repository.getCurrentUser();
+      if (userProfile != null) {
         state = state.copyWith(
-          email: user.email,
-          name: user.name,
-          role: user.role,
+          email: userProfile.email,
+          name: userProfile.name,
+          role: userProfile.role,
         );
       }
     }
@@ -45,15 +46,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         password: password,
       );
 
-      if (response.success && response.accessToken != null) {
-        await _secureStorage.saveAccessToken(response.accessToken!);
-        if (response.refreshToken != null) {
-          await _secureStorage.saveRefreshToken(response.refreshToken!);
-        }
-        if (response.userId != null) {
-          await _secureStorage.saveUserId(response.userId!);
-        }
-
+      if (response.success && response.userId != null) {
         state = AuthState(
           isAuthenticated: true,
           userId: response.userId,
@@ -134,7 +127,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = state.copyWith(isLoading: true);
 
     await _repository.logout();
-    await _secureStorage.clearAll();
 
     state = const AuthState();
   }
@@ -143,8 +135,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
 /// Auth provider
 final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
   final repository = ref.watch(authRepositoryProvider);
-  final secureStorage = ref.watch(secureStorageProvider);
-  return AuthNotifier(repository, secureStorage);
+  final supabaseService = ref.watch(supabaseServiceProvider);
+  return AuthNotifier(repository, supabaseService);
 });
 
 /// Check if user is admin

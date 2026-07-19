@@ -1,13 +1,13 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../constants/env.dart';
-import 'secure_storage_service.dart';
+import 'supabase_service.dart';
 
-/// API client using Dio
+/// API client using Dio with Supabase Auth token
 class ApiClient {
-  ApiClient(this._secureStorage);
+  ApiClient(this._supabaseService);
 
-  final SecureStorageService _secureStorage;
+  final SupabaseService _supabaseService;
   late final Dio _dio;
 
   /// Initialize the API client
@@ -24,36 +24,11 @@ class ApiClient {
 
     _dio.interceptors.add(InterceptorsWrapper(
       onRequest: (options, handler) async {
-        final token = await _secureStorage.getAccessToken();
+        final token = _supabaseService.accessToken;
         if (token != null) {
           options.headers['Authorization'] = 'Bearer $token';
         }
         return handler.next(options);
-      },
-      onError: (error, handler) async {
-        if (error.response?.statusCode == 401) {
-          try {
-            final refreshToken = await _secureStorage.getRefreshToken();
-            if (refreshToken != null) {
-              final response = await _dio.post(
-                '/api/v1/auth/refresh',
-                data: {'refreshToken': refreshToken},
-              );
-              if (response.statusCode == 200) {
-                final newAccessToken = response.data['accessToken'] as String;
-                final newRefreshToken = response.data['refreshToken'] as String;
-                await _secureStorage.saveAccessToken(newAccessToken);
-                await _secureStorage.saveRefreshToken(newRefreshToken);
-                error.requestOptions.headers['Authorization'] = 'Bearer $newAccessToken';
-                final retryResponse = await _dio.fetch(error.requestOptions);
-                return handler.resolve(retryResponse);
-              }
-            }
-          } catch (e) {
-            await _secureStorage.clearAll();
-          }
-        }
-        return handler.next(error);
       },
     ),);
   }
@@ -137,8 +112,8 @@ class ApiClient {
 
 /// Provider for API client
 final apiClientProvider = Provider<ApiClient>((ref) {
-  final secureStorage = ref.watch(secureStorageProvider);
-  final client = ApiClient(secureStorage);
+  final supabaseService = ref.watch(supabaseServiceProvider);
+  final client = ApiClient(supabaseService);
   client.init();
   return client;
 });

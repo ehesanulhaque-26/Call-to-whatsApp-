@@ -12,7 +12,7 @@ import '../../features/settings/presentation/screens/settings_screen.dart';
 import '../../features/admin/presentation/screens/admin_dashboard_screen.dart';
 import '../../features/admin/presentation/screens/users_screen.dart';
 import '../../features/admin/presentation/screens/subscriptions_screen.dart';
-import '../services/secure_storage_service.dart';
+import '../services/supabase_service.dart';
 // import '../theme/app_tokens.dart';
 
 class AppRoutes {
@@ -35,13 +35,13 @@ final _rootNavigatorKey = GlobalKey<NavigatorState>();
 final _shellNavigatorKey = GlobalKey<NavigatorState>();
 
 final routerProvider = Provider<GoRouter>((ref) {
-  final secureStorage = ref.watch(secureStorageProvider);
+  final supabaseService = ref.watch(supabaseServiceProvider);
 
   return GoRouter(
     navigatorKey: _rootNavigatorKey,
     initialLocation: AppRoutes.splash,
     redirect: (context, state) async {
-      final isLoggedIn = await secureStorage.hasValidSession();
+      final isLoggedIn = supabaseService.isAuthenticated;
       final isAuthRoute = state.matchedLocation == AppRoutes.login ||
           state.matchedLocation == AppRoutes.register ||
           state.matchedLocation == AppRoutes.forgotPassword ||

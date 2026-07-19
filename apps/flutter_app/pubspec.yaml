@@ -21,6 +21,9 @@ dependencies:
   # Network
   dio: ^5.4.0
   
+  # Supabase Auth
+  supabase_flutter: ^2.3.0
+  
   # Local Storage
   flutter_secure_storage: ^9.0.0
   shared_preferences: ^2.2.2

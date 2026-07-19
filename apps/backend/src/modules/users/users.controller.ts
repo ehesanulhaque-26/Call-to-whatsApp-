@@ -2,96 +2,66 @@ import {
   Controller,
   Get,
   Patch,
-  Delete,
   Body,
   Param,
   UseGuards,
   HttpCode,
   HttpStatus,
+  Query,
 } from '@nestjs/common';
-import { AuthGuard } from '@nestjs/passport';
-import { ApiBearerAuth, ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
-import { UsersService } from './users.service';
-import { UpdateUserDto } from './dto/update-user.dto';
-import { CurrentUser, CurrentUserPayload } from '../../common/decorators/current-user.decorator';
+import { ApiBearerAuth, ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
+import { UsersService, Profile } from './users.service';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
-import { RolesGuard } from '../../common/guards/roles.guard';
 
-@ApiTags('users')
+@ApiTags('profiles')
 @ApiBearerAuth()
-@Controller('users')
-@UseGuards(AuthGuard('jwt'), RolesGuard)
+@Controller('profiles')
+@UseGuards(JwtAuthGuard)
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
-  @Get('me')
-  @ApiOperation({ summary: 'Get current user profile' })
-  @ApiResponse({
-    status: 200,
-    description: 'Current user profile',
-  })
-  async getMe(@CurrentUser() user: CurrentUserPayload) {
-    return this.usersService.findById(user.userId);
-  }
-
-  @Patch('me')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Update current user profile' })
-  @ApiResponse({
-    status: 200,
-    description: 'User updated successfully',
-  })
-  async updateMe(@CurrentUser() user: CurrentUserPayload, @Body() updateUserDto: UpdateUserDto) {
-    return this.usersService.update(user.userId, updateUserDto);
-  }
-
   @Get()
   @Roles('admin')
-  @ApiOperation({ summary: 'Get all users (admin only)' })
+  @ApiOperation({ summary: 'Get all profiles (admin only)' })
   @ApiResponse({
     status: 200,
-    description: 'List of all users',
+    description: 'List of all profiles',
   })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'role', required: false, type: String })
   async findAll(
-    @Body('page') page?: number,
-    @Body('limit') limit?: number,
-    @Body('role') role?: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @Query('role') role?: string,
   ) {
     return this.usersService.findAll({ page, limit, role });
   }
 
   @Get(':id')
   @Roles('admin')
-  @ApiOperation({ summary: 'Get user by ID (admin only)' })
+  @ApiOperation({ summary: 'Get profile by ID (admin only)' })
   @ApiResponse({
     status: 200,
-    description: 'User details',
+    description: 'Profile details',
   })
-  async findOne(@Param('id') id: string) {
+  async findOne(@Param('id') id: string): Promise<Profile> {
     return this.usersService.findById(id);
   }
 
-  @Patch(':id')
+  @Patch(':id/role')
   @Roles('admin')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Update user by ID (admin only)' })
+  @ApiOperation({ summary: 'Update user role (admin only)' })
   @ApiResponse({
     status: 200,
-    description: 'User updated successfully',
+    description: 'Role updated successfully',
   })
-  async update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
-    return this.usersService.update(id, updateUserDto);
-  }
-
-  @Delete(':id')
-  @Roles('admin')
-  @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Delete user by ID (admin only)' })
-  @ApiResponse({
-    status: 204,
-    description: 'User deleted successfully',
-  })
-  async remove(@Param('id') id: string) {
-    await this.usersService.delete(id);
+  async updateRole(
+    @Param('id') id: string,
+    @Body('role') role: 'admin' | 'user',
+  ): Promise<Profile> {
+    return this.usersService.updateRole(id, role);
   }
 }

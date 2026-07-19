@@ -1,6 +1,6 @@
-import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../../core/services/api_client.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../../core/services/supabase_service.dart';
 
 /// Auth repository interface
 abstract class AuthRepository {
@@ -23,8 +23,6 @@ class AuthResponse {
     this.email,
     this.name,
     this.role,
-    this.accessToken,
-    this.refreshToken,
     this.error,
   });
 
@@ -33,8 +31,6 @@ class AuthResponse {
   final String? email;
   final String? name;
   final String? role;
-  final String? accessToken;
-  final String? refreshToken;
   final String? error;
 }
 
@@ -57,11 +53,11 @@ class UserProfile {
   final DateTime? updatedAt;
 }
 
-/// Auth repository implementation
+/// Auth repository implementation using Supabase Auth
 class AuthRepositoryImpl implements AuthRepository {
-  AuthRepositoryImpl(this._apiClient);
+  AuthRepositoryImpl(this._supabaseService);
 
-  final ApiClient _apiClient;
+  final SupabaseService _supabaseService;
 
   @override
   Future<AuthResponse> login({
@@ -69,29 +65,30 @@ class AuthRepositoryImpl implements AuthRepository {
     required String password,
   }) async {
     try {
-      final response = await _apiClient.post(
-        '/api/v1/auth/login',
-        data: {
-          'email': email,
-          'password': password,
-        },
+      final response = await _supabaseService.signIn(
+        email: email,
+        password: password,
       );
 
-      final data = response.data;
-      return AuthResponse(
-        success: true,
-        userId: data['userId'] ?? data['user']?['id'],
-        email: data['email'] ?? data['user']?['email'],
-        name: data['name'] ?? data['user']?['name'],
-        role: data['role'] ?? data['user']?['role'],
-        accessToken: data['accessToken'] ?? data['token'],
-        refreshToken: data['refreshToken'] ?? data['refresh_token'],
-      );
-    } on DioException catch (e) {
-      final apiException = ApiException.fromDioError(e);
+      final user = response.user;
+      if (user != null) {
+        return AuthResponse(
+          success: true,
+          userId: user.id,
+          email: user.email,
+          name: user.userMetadata?['name'] ?? '',
+          role: 'user', // Will be fetched from profile
+        );
+      } else {
+        return AuthResponse(
+          success: false,
+          error: 'Login failed',
+        );
+      }
+    } on AuthException catch (e) {
       return AuthResponse(
         success: false,
-        error: apiException.message,
+        error: e.message,
       );
     } catch (e) {
       return AuthResponse(
@@ -108,28 +105,31 @@ class AuthRepositoryImpl implements AuthRepository {
     required String password,
   }) async {
     try {
-      final response = await _apiClient.post(
-        '/api/v1/auth/register',
-        data: {
-          'name': name,
-          'email': email,
-          'password': password,
-        },
+      final response = await _supabaseService.signUp(
+        email: email,
+        password: password,
+        name: name,
       );
 
-      final data = response.data;
-      return AuthResponse(
-        success: true,
-        userId: data['userId'] ?? data['user']?['id'],
-        email: data['email'] ?? data['user']?['email'],
-        name: data['name'] ?? data['user']?['name'],
-        role: data['role'] ?? data['user']?['role'],
-      );
-    } on DioException catch (e) {
-      final apiException = ApiException.fromDioError(e);
+      final user = response.user;
+      if (user != null) {
+        return AuthResponse(
+          success: true,
+          userId: user.id,
+          email: user.email,
+          name: name,
+          role: 'user',
+        );
+      } else {
+        return AuthResponse(
+          success: false,
+          error: 'Registration failed',
+        );
+      }
+    } on AuthException catch (e) {
       return AuthResponse(
         success: false,
-        error: apiException.message,
+        error: e.message,
       );
     } catch (e) {
       return AuthResponse(
@@ -142,14 +142,10 @@ class AuthRepositoryImpl implements AuthRepository {
   @override
   Future<bool> forgotPassword({required String email}) async {
     try {
-      await _apiClient.post(
-        '/api/v1/auth/forgot-password',
-        data: {'email': email},
-      );
+      await _supabaseService.resetPassword(email);
       return true;
-    } on DioException catch (e) {
-      final apiException = ApiException.fromDioError(e);
-      throw Exception(apiException.message);
+    } on AuthException catch (e) {
+      throw Exception(e.message);
     } catch (e) {
       throw Exception('An unexpected error occurred');
     }
@@ -158,7 +154,7 @@ class AuthRepositoryImpl implements AuthRepository {
   @override
   Future<bool> logout() async {
     try {
-      await _apiClient.post('/api/v1/auth/logout');
+      await _supabaseService.signOut();
       return true;
     } catch (e) {
       return true; // Logout locally even if API fails
@@ -168,19 +164,14 @@ class AuthRepositoryImpl implements AuthRepository {
   @override
   Future<UserProfile?> getCurrentUser() async {
     try {
-      final response = await _apiClient.get('/api/v1/users/me');
-      final data = response.data;
+      final user = _supabaseService.currentUser;
+      if (user == null) return null;
+
       return UserProfile(
-        id: data['id'],
-        email: data['email'],
-        name: data['name'],
-        role: data['role'],
-        createdAt: data['createdAt'] != null
-            ? DateTime.parse(data['createdAt'])
-            : null,
-        updatedAt: data['updatedAt'] != null
-            ? DateTime.parse(data['updatedAt'])
-            : null,
+        id: user.id,
+        email: user.email ?? '',
+        name: user.userMetadata?['name'] ?? '',
+        role: 'user', // Will be updated when profile is fetched
       );
     } catch (e) {
       return null;
@@ -190,6 +181,6 @@ class AuthRepositoryImpl implements AuthRepository {
 
 /// Auth repository provider
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
-  final apiClient = ref.watch(apiClientProvider);
-  return AuthRepositoryImpl(apiClient);
+  final supabaseService = ref.watch(supabaseServiceProvider);
+  return AuthRepositoryImpl(supabaseService);
 });
