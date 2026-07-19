@@ -460,6 +460,40 @@ CREATE POLICY "Users can delete their own settings"
     USING (user_id = auth.uid());
 
 -- ============================================
+-- REFRESH TOKENS TABLE
+-- ============================================
+
+CREATE TABLE refresh_tokens (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token_hash VARCHAR(255) NOT NULL,
+    device_info TEXT,
+    ip_address VARCHAR(45),
+    user_agent TEXT,
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    is_revoked BOOLEAN DEFAULT false,
+    revoked_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_refresh_tokens_user_id ON refresh_tokens(user_id);
+CREATE INDEX idx_refresh_tokens_token_hash ON refresh_tokens(token_hash);
+CREATE INDEX idx_refresh_tokens_expires_at ON refresh_tokens(expires_at);
+
+-- Refresh tokens policies
+CREATE POLICY "Users can view their own refresh tokens"
+    ON refresh_tokens FOR SELECT
+    USING (user_id = auth.uid());
+
+CREATE POLICY "Users can insert their own refresh tokens"
+    ON refresh_tokens FOR INSERT
+    WITH CHECK (user_id = auth.uid());
+
+CREATE POLICY "Users can update their own refresh tokens"
+    ON refresh_tokens FOR UPDATE
+    USING (user_id = auth.uid());
+
+-- ============================================
 -- SEED DATA
 -- ============================================
 

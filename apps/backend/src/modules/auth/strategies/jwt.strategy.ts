@@ -19,7 +19,11 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: JwtPayload) {
-    // Optionally verify user still exists in database
+    // Only validate access tokens
+    if (payload.type !== 'access') {
+      throw new UnauthorizedException('Invalid token type');
+    }
+
     const { data } = await this.supabaseService.findById('users', payload.sub);
 
     if (!data) {

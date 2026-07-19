@@ -30,7 +30,29 @@ class ApiClient {
         }
         return handler.next(options);
       },
-      onError: (error, handler) {
+      onError: (error, handler) async {
+        if (error.response?.statusCode == 401) {
+          try {
+            final refreshToken = await _secureStorage.getRefreshToken();
+            if (refreshToken != null) {
+              final response = await _dio.post(
+                '/api/v1/auth/refresh',
+                data: {'refreshToken': refreshToken},
+              );
+              if (response.statusCode == 200) {
+                final newAccessToken = response.data['accessToken'] as String;
+                final newRefreshToken = response.data['refreshToken'] as String;
+                await _secureStorage.saveAccessToken(newAccessToken);
+                await _secureStorage.saveRefreshToken(newRefreshToken);
+                error.requestOptions.headers['Authorization'] = 'Bearer $newAccessToken';
+                final retryResponse = await _dio.fetch(error.requestOptions);
+                return handler.resolve(retryResponse);
+              }
+            }
+          } catch (e) {
+            await _secureStorage.clearAll();
+          }
+        }
         return handler.next(error);
       },
     ),);
