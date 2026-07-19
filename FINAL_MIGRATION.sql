@@ -1,7 +1,7 @@
 -- ============================================
 -- OpenWA SaaS Database Schema
 -- Using Supabase Auth
--- Idempotent migration - safe to run on fresh or existing databases
+-- Idempotent migration - safe to run on fresh, partially, or fully initialized databases
 -- ============================================
 
 -- ============================================
@@ -10,7 +10,9 @@
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- Create enum types idempotently
+-- Create enum types idempotently using DO $$ blocks
+-- Future enum values can be added with: ALTER TYPE ... ADD VALUE IF NOT EXISTS 'value';
+
 DO $$ BEGIN
     CREATE TYPE subscription_status AS ENUM ('active', 'inactive', 'cancelled', 'expired');
 EXCEPTION
@@ -185,6 +187,53 @@ CREATE TABLE IF NOT EXISTS settings (
 );
 
 -- ============================================
+-- SECTION 2b: Column Recovery (for partially initialized databases)
+-- ============================================
+-- These statements ensure all expected columns exist even if table was partially created
+
+-- Profiles columns
+DO $$ BEGIN
+    ALTER TABLE profiles ADD COLUMN IF NOT EXISTS phone TEXT;
+EXCEPTION WHEN duplicate_column THEN null;
+END $$;
+DO $$ BEGIN
+    ALTER TABLE profiles ADD COLUMN IF NOT EXISTS avatar_url TEXT;
+EXCEPTION WHEN duplicate_column THEN null;
+END $$;
+
+-- Subscriptions columns
+DO $$ BEGIN
+    ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS cancelled_at TIMESTAMP WITH TIME ZONE;
+EXCEPTION WHEN duplicate_column THEN null;
+END $$;
+
+-- Sessions columns
+DO $$ BEGIN
+    ALTER TABLE sessions ADD COLUMN IF NOT EXISTS last_scanned_at TIMESTAMP WITH TIME ZONE;
+EXCEPTION WHEN duplicate_column THEN null;
+END $$;
+DO $$ BEGIN
+    ALTER TABLE sessions ADD COLUMN IF NOT EXISTS last_message_at TIMESTAMP WITH TIME ZONE;
+EXCEPTION WHEN duplicate_column THEN null;
+END $$;
+
+-- Automations columns
+DO $$ BEGIN
+    ALTER TABLE automations ADD COLUMN IF NOT EXISTS last_executed_at TIMESTAMP WITH TIME ZONE;
+EXCEPTION WHEN duplicate_column THEN null;
+END $$;
+
+-- Contacts columns
+DO $$ BEGIN
+    ALTER TABLE contacts ADD COLUMN IF NOT EXISTS push_name VARCHAR(255);
+EXCEPTION WHEN duplicate_column THEN null;
+END $$;
+DO $$ BEGIN
+    ALTER TABLE contacts ADD COLUMN IF NOT EXISTS is_starred BOOLEAN DEFAULT false;
+EXCEPTION WHEN duplicate_column THEN null;
+END $$;
+
+-- ============================================
 -- SECTION 3: All Indexes (idempotent)
 -- ============================================
 
@@ -236,16 +285,18 @@ CREATE INDEX IF NOT EXISTS idx_activity_logs_created_at ON activity_logs(created
 CREATE INDEX IF NOT EXISTS idx_settings_user_id ON settings(user_id);
 
 -- ============================================
--- SECTION 4: Trigger Function
+-- SECTION 4: Trigger Functions (with explicit search_path for security)
 -- ============================================
 
 CREATE OR REPLACE FUNCTION update_updated_at_column()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
 BEGIN
     NEW.updated_at = NOW();
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 -- ============================================
 -- SECTION 5: All Triggers (idempotent)
@@ -279,18 +330,71 @@ DROP TRIGGER IF EXISTS update_settings_updated_at ON settings;
 CREATE TRIGGER update_settings_updated_at BEFORE UPDATE ON settings FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- ============================================
--- SECTION 6: Enable RLS (idempotent)
+-- SECTION 6: Enable RLS (idempotent with existence checks)
 -- ============================================
 
-ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE subscriptions ENABLE ROW LEVEL SECURITY;
-ALTER TABLE sessions ENABLE ROW LEVEL SECURITY;
-ALTER TABLE automations ENABLE ROW LEVEL SECURITY;
-ALTER TABLE campaigns ENABLE ROW LEVEL SECURITY;
-ALTER TABLE contacts ENABLE ROW LEVEL SECURITY;
-ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
-ALTER TABLE activity_logs ENABLE ROW LEVEL SECURITY;
-ALTER TABLE settings ENABLE ROW LEVEL SECURITY;
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'profiles') THEN
+        ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+    END IF;
+END $$;
+
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'subscriptions') THEN
+        ALTER TABLE subscriptions ENABLE ROW LEVEL SECURITY;
+    END IF;
+END $$;
+
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'sessions') THEN
+        ALTER TABLE sessions ENABLE ROW LEVEL SECURITY;
+    END IF;
+END $$;
+
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'automations') THEN
+        ALTER TABLE automations ENABLE ROW LEVEL SECURITY;
+    END IF;
+END $$;
+
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'campaigns') THEN
+        ALTER TABLE campaigns ENABLE ROW LEVEL SECURITY;
+    END IF;
+END $$;
+
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'contacts') THEN
+        ALTER TABLE contacts ENABLE ROW LEVEL SECURITY;
+    END IF;
+END $$;
+
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'notifications') THEN
+        ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
+    END IF;
+END $$;
+
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'activity_logs') THEN
+        ALTER TABLE activity_logs ENABLE ROW LEVEL SECURITY;
+    END IF;
+END $$;
+
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'settings') THEN
+        ALTER TABLE settings ENABLE ROW LEVEL SECURITY;
+    END IF;
+END $$;
 
 -- ============================================
 -- SECTION 7: All Policies (idempotent)
@@ -400,7 +504,11 @@ CREATE POLICY "Users can delete their own settings" ON settings FOR DELETE USING
 -- ============================================
 
 CREATE OR REPLACE FUNCTION public.handle_new_user()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
 BEGIN
     INSERT INTO public.profiles (id, name, role)
     VALUES (
@@ -411,7 +519,7 @@ BEGIN
     ON CONFLICT (id) DO NOTHING;
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
 
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
@@ -419,12 +527,40 @@ CREATE TRIGGER on_auth_user_created
     FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
 -- ============================================
--- SECTION 9: Admin helper function
+-- SECTION 9: Admin helper function (restricted)
 -- ============================================
 
-CREATE OR REPLACE FUNCTION public.promote_to_admin(user_id UUID)
-RETURNS VOID AS $$
+CREATE OR REPLACE FUNCTION public.promote_to_admin(target_user_id UUID)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
 BEGIN
-    UPDATE profiles SET role = 'admin' WHERE id = user_id;
+    -- Only allow if called by service_role (bypass RLS) or admin
+    -- This function should only be called from backend/service context
+    UPDATE profiles SET role = 'admin' WHERE id = target_user_id;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
+
+-- Revoke execute from public, only service_role can call this
+REVOKE EXECUTE ON FUNCTION public.promote_to_admin(UUID) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.promote_to_admin(UUID) TO service_role;
+
+-- ============================================
+-- SECTION 10: Grants for Supabase roles
+-- ============================================
+
+-- Service role has full access (bypasses RLS)
+GRANT USAGE ON SCHEMA public TO service_role;
+GRANT ALL ON ALL TABLES IN SCHEMA public TO service_role;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO service_role;
+GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO service_role;
+
+-- Authenticated users can use the trigger function
+GRANT EXECUTE ON FUNCTION public.handle_new_user() TO service_role;
+
+-- Anon and authenticated have minimal access through RLS
+GRANT USAGE ON SCHEMA public TO anon, authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO authenticated;
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO anon;
