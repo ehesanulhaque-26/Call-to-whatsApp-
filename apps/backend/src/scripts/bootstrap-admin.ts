@@ -1,19 +1,19 @@
 /**
  * Development Admin Bootstrap Script
- * 
+ *
  * This script creates an admin user for development purposes.
  * It reads credentials from environment variables.
- * 
+ *
  * Environment Variables Required:
  * - ADMIN_EMAIL: Email for the admin user
  * - ADMIN_PASSWORD: Password for the admin user  
  * - ADMIN_NAME: Display name for the admin user
  * - SUPABASE_URL: Supabase project URL
  * - SUPABASE_SERVICE_KEY: Supabase service role key
- * 
+ *
  * Usage:
  * npx ts-node src/scripts/bootstrap-admin.ts
- * 
+ *
  * Or with environment file:
  * ADMIN_EMAIL=admin@example.com ADMIN_PASSWORD=password ADMIN_NAME=Admin npx ts-node src/scripts/bootstrap-admin.ts
  */
@@ -44,7 +44,9 @@ function getConfig(): Config {
   }
 
   if (!adminEmail || !adminPassword || !adminName) {
-    throw new Error('Missing required environment variables: ADMIN_EMAIL, ADMIN_PASSWORD, ADMIN_NAME');
+    throw new Error(
+      'Missing required environment variables: ADMIN_EMAIL, ADMIN_PASSWORD, ADMIN_NAME',
+    );
   }
 
   return {
@@ -56,10 +58,7 @@ function getConfig(): Config {
   };
 }
 
-async function checkAdminExists(
-  supabase: SupabaseClient,
-  email: string,
-): Promise<string | null> {
+async function checkAdminExists(supabase: SupabaseClient, email: string): Promise<string | null> {
   const { data, error } = await supabase.auth.admin.listUsers();
 
   if (error) {
@@ -76,7 +75,7 @@ async function createAdminUser(
   password: string,
   name: string,
 ): Promise<string> {
-  const { data, user, error } = await supabase.auth.admin.createUser({
+  const { data, error } = await supabase.auth.admin.createUser({
     email,
     password,
     email_confirm: true,
@@ -87,6 +86,7 @@ async function createAdminUser(
     throw new Error(`Failed to create user: ${error.message}`);
   }
 
+  const user = data?.user;
   if (!user) {
     throw new Error('User was not returned from creation');
   }
