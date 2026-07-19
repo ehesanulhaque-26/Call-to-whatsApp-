@@ -50,3 +50,5 @@ flutter:
   
   assets:
     - assets/images/
+dependency_overrides:
+  app_links: 6.3.2
