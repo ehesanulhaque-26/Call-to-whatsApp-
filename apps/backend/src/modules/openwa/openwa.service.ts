@@ -30,58 +30,80 @@ export class OpenWAService {
   private readonly logger = new Logger(OpenWAService.name);
   private readonly client: AxiosInstance;
   private readonly baseURL: string;
+  private readonly apiKey: string | undefined;
 
   constructor(private readonly configService: ConfigService) {
     // Debug: Log all environment variables at startup
     this.logger.warn('========================================');
     this.logger.warn('[OpenWA] SERVICE INITIALIZATION STARTING');
     this.logger.warn('[OpenWA] All env vars containing OPENWA:');
-    Object.keys(process.env).forEach(key => {
+    Object.keys(process.env).forEach((key) => {
       if (key.toUpperCase().includes('OPENWA')) {
-        this.logger.warn(`[OpenWA]   ${key} = ${process.env[key]}`);
+        this.logger.warn(
+          `[OpenWA]   ${key} = ${key.includes('KEY') ? '[REDACTED]' : process.env[key]}`,
+        );
       }
     });
     this.logger.warn('[OpenWA] All env vars containing RAILWAY:');
-    Object.keys(process.env).forEach(key => {
+    Object.keys(process.env).forEach((key) => {
       if (key.toUpperCase().includes('RAILWAY')) {
         this.logger.warn(`[OpenWA]   ${key} = ${process.env[key]}`);
       }
     });
     this.logger.warn('========================================');
-    
-    // Try multiple environment variable names
-    const openwaUrl = this.configService.get<string>('OPENWA_URL') || 
-                       process.env.OPENWA_URL ||
-                       'http://openwa.railway.internal';
-    
+
+    // Try multiple environment variable names for OpenWA URL
+    const openwaUrl =
+      this.configService.get<string>('OPENWA_URL') ||
+      process.env.OPENWA_URL ||
+      'http://openwa.railway.internal';
+
+    // Get OpenWA API key - can be passed directly or as part of URL
+    this.apiKey = this.configService.get<string>('OPENWA_API_KEY') || process.env.OPENWA_API_KEY;
+
     this.baseURL = openwaUrl;
 
-    this.logger.warn(`[OpenWA] ConfigService.get('OPENWA_URL') = ${this.configService.get<string>('OPENWA_URL') || 'UNDEFINED'}`);
+    this.logger.warn(
+      `[OpenWA] ConfigService.get('OPENWA_URL') = ${this.configService.get<string>('OPENWA_URL') || 'UNDEFINED'}`,
+    );
+    this.logger.warn(
+      `[OpenWA] ConfigService.get('OPENWA_API_KEY') = ${this.apiKey ? '[SET]' : 'UNDEFINED'}`,
+    );
     this.logger.warn(`[OpenWA] Using baseURL: ${this.baseURL}`);
     this.logger.warn('========================================');
+
+    // Build headers with optional API key
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    if (this.apiKey) {
+      headers['X-API-Key'] = this.apiKey;
+    }
 
     this.client = axios.create({
       baseURL: this.baseURL,
       timeout: 60000,
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers,
     });
 
     // Request interceptor for detailed logging
     this.client.interceptors.request.use(
       (config) => {
+        const logHeaders = { ...config.headers };
+        // Redact API key in logs
+        if (logHeaders['X-API-Key']) logHeaders['X-API-Key'] = '[REDACTED]';
+
         this.logger.warn(`[OpenWA] >>> REQUEST
   URL: ${config.baseURL}${config.url}
   Method: ${config.method?.toUpperCase()}
-  Headers: ${JSON.stringify(config.headers, null, 2)}
+  Headers: ${JSON.stringify(logHeaders, null, 2)}
   Data: ${config.data ? JSON.stringify(config.data) : 'none'}`);
         return config;
       },
       (error) => {
         this.logger.error(`[OpenWA] Request interceptor error: ${error.message}`);
         return Promise.reject(error);
-      }
+      },
     );
 
     // Response interceptor for detailed logging
@@ -90,7 +112,6 @@ export class OpenWAService {
         this.logger.warn(`[OpenWA] <<< RESPONSE
   URL: ${response.config.baseURL}${response.config.url}
   Status: ${response.status} ${response.statusText}
-  Headers: ${JSON.stringify(response.headers, null, 2)}
   Data: ${JSON.stringify(response.data)}`);
         return response;
       },
@@ -100,26 +121,24 @@ export class OpenWAService {
   Method: ${error.config?.method?.toUpperCase()}
   Error Code: ${error.code}
   Status: ${error.response?.status || 'N/A'}
-  Response Headers: ${error.response ? JSON.stringify(error.response.headers) : 'N/A'}
   Response Data: ${error.response ? JSON.stringify(error.response.data) : 'N/A'}
-  Message: ${error.message}
-  Stack: ${error.stack}`);
+  Message: ${error.message}`);
         return Promise.reject(error);
-      }
+      },
     );
   }
 
   private async request<T>(method: string, path: string, data?: unknown): Promise<T> {
     const fullUrl = `${this.baseURL}${path}`;
-    
+
     this.logger.warn(`[OpenWA] ${'='.repeat(50)}`);
     this.logger.warn(`[OpenWA] MAKING REQUEST: ${method.toUpperCase()} ${fullUrl}`);
     if (data) {
       this.logger.warn(`[OpenWA] Request data: ${JSON.stringify(data)}`);
     }
-    
+
     const startTime = Date.now();
-    
+
     try {
       const response = await this.client.request<T>({
         method,
@@ -127,24 +146,26 @@ export class OpenWAService {
         data,
       });
       const duration = Date.now() - startTime;
-      
+
       this.logger.warn(`[OpenWA] SUCCESS: ${response.status} in ${duration}ms`);
       this.logger.warn(`[OpenWA] Response: ${JSON.stringify(response.data)}`);
       this.logger.warn(`[OpenWA] ${'='.repeat(50)}`);
-      
+
       return response.data;
     } catch (error) {
       const axiosError = error as AxiosError;
       const duration = Date.now() - startTime;
-      
+
       this.logger.error(`[OpenWA] FAILED after ${duration}ms`);
       this.logger.error(`[OpenWA] Error code: ${axiosError.code}`);
       this.logger.error(`[OpenWA] Error message: ${axiosError.message}`);
-      
+
       if (axiosError.code === 'ECONNREFUSED') {
         this.logger.error(`[OpenWA] CONNECTION REFUSED - Cannot reach ${this.baseURL}`);
         this.logger.error(`[OpenWA] This means OpenWA service is not accessible at this URL`);
-        this.logger.error(`[OpenWA] Check: 1) OpenWA is deployed, 2) Network connectivity, 3) URL is correct`);
+        this.logger.error(
+          `[OpenWA] Check: 1) OpenWA is deployed, 2) Network connectivity, 3) URL is correct`,
+        );
       } else if (axiosError.code === 'ETIMEDOUT') {
         this.logger.error(`[OpenWA] TIMEOUT - Request exceeded 60 seconds`);
       } else if (axiosError.code === 'ENOTFOUND') {
@@ -154,9 +175,9 @@ export class OpenWAService {
         this.logger.error(`[OpenWA] HTTP ERROR ${axiosError.response.status}`);
         this.logger.error(`[OpenWA] Response body: ${JSON.stringify(axiosError.response.data)}`);
       }
-      
+
       this.logger.error(`[OpenWA] ${'='.repeat(50)}`);
-      
+
       throw new HttpException(
         `OpenWA request failed: ${axiosError.message}`,
         HttpStatus.BAD_GATEWAY,
