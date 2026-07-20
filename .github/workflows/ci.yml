@@ -28,7 +28,7 @@ jobs:
           channel: 'stable'
 
       - name: Cache Flutter packages
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: |
             ~/.pub-cache
@@ -38,10 +38,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-flutter-
 
-      - name: Get Flutter dependencies
-        run: |
-          cd apps/flutter_app
-          flutter pub get
       - name: Get Flutter dependencies
         run: |
           cd apps/flutter_app
@@ -67,7 +63,7 @@ jobs:
           channel: 'stable'
 
       - name: Cache Flutter packages
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: |
             ~/.pub-cache
