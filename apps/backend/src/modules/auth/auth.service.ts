@@ -1,5 +1,4 @@
 import { Injectable, UnauthorizedException, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { SupabaseService } from '../supabase/supabase.service';
 
 export interface SupabaseUser {
@@ -25,16 +24,8 @@ export interface Profile {
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
-  private readonly supabaseUrl: string;
-  private readonly supabaseJwtSecret: string;
 
-  constructor(
-    private readonly supabaseService: SupabaseService,
-    private readonly configService: ConfigService,
-  ) {
-    this.supabaseUrl = this.configService.get<string>('SUPABASE_URL') || '';
-    this.supabaseJwtSecret = this.configService.get<string>('SUPABASE_JWT_SECRET') || '';
-  }
+  constructor(private readonly supabaseService: SupabaseService) {}
 
   /**
    * Verify Supabase JWT token and extract user info

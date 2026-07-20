@@ -262,4 +262,35 @@ export class SupabaseService {
       };
     }
   }
+
+  /**
+   * Verify a Supabase JWT token and return the user
+   * Uses Supabase's built-in token verification
+   */
+  async verifyToken(token: string): Promise<{
+    user: { id: string; email?: string } | null;
+    error: Error | null;
+  }> {
+    try {
+      const { data: user, error } = await this._serviceClient.auth.getUser(token);
+
+      if (error || !user) {
+        return { user: null, error: error || new Error('Invalid token') };
+      }
+
+      return {
+        user: {
+          id: user.user.id,
+          email: user.user.email,
+        },
+        error: null,
+      };
+    } catch (error) {
+      this.logger.error('Token verification error:', error);
+      return {
+        user: null,
+        error: error instanceof Error ? error : new Error('Token verification failed'),
+      };
+    }
+  }
 }

@@ -56,7 +56,7 @@ Successfully migrated the authentication system from custom JWT-based authentica
 | Authorization middleware validates Supabase JWT | ✅ `JwtAuthGuard` uses `authService.verifySupabaseToken()` |
 | Profile loading works | ✅ `AuthService.getProfile()` loads from profiles table |
 | Admin role checking | ✅ `AuthService.isAdmin()` checks profile.role |
-| No JWT_SECRET dependency | ✅ Uses `SUPABASE_JWT_SECRET` for Supabase verification |
+| No JWT_SECRET dependency | ✅ Authentication uses Supabase Auth exclusively |
 | No passport-jwt dependency | ✅ Removed |
 | No bcrypt dependency | ✅ Removed |
 | No custom refresh token logic | ✅ Removed |
@@ -231,7 +231,6 @@ npx ts-node src/scripts/bootstrap-admin.ts
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SERVICE_KEY=your-service-role-key
-SUPABASE_JWT_SECRET=your-jwt-secret
 ```
 
 ### Required for Flutter:
@@ -266,7 +265,6 @@ psql -h your-db-host -U postgres -d postgres -f apps/backend/supabase/migrations
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SERVICE_KEY=your-service-role-key
-SUPABASE_JWT_SECRET=your-jwt-secret
 
 # Flutter (build.yaml or environment variables)
 SUPABASE_URL=https://your-project.supabase.co

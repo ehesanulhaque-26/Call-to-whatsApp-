@@ -10,9 +10,8 @@ import {
 } from '@nestjs/websockets';
 import { Logger } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
-import { JwtService } from '@nestjs/jwt';
-import { ConfigService } from '@nestjs/config';
 import { SessionManagerService, SessionEvent } from './session-manager.service';
+import { SupabaseService } from '../supabase/supabase.service';
 import { OnEvent } from '@nestjs/event-emitter';
 
 interface AuthenticatedSocket extends Socket {
@@ -39,8 +38,7 @@ export class SessionManagerGateway
 
   constructor(
     private readonly sessionManager: SessionManagerService,
-    private readonly jwtService: JwtService,
-    private readonly configService: ConfigService,
+    private readonly supabaseService: SupabaseService,
   ) {}
 
   afterInit(): void {
@@ -60,40 +58,20 @@ export class SessionManagerGateway
         return;
       }
 
-      const decoded = await this.jwtService
-        .verifyAsync(token, {
-          secret: this.configService.get<string>('JWT_SECRET'),
-        })
-        .catch(() => null);
+      // Verify token using Supabase (same as REST API)
+      const { user, error } = await this.supabaseService.verifyToken(token);
 
-      if (!decoded) {
-        // Try Supabase token
-        const supabaseToken = this.configService.get<string>('SUPABASE_JWT_SECRET');
-        if (supabaseToken) {
-          const supabaseDecoded = await this.jwtService
-            .verifyAsync(token, {
-              secret: supabaseToken,
-            })
-            .catch(() => null);
-
-          if (supabaseDecoded) {
-            client.userId = supabaseDecoded.sub || supabaseDecoded.user_id;
-            client.userEmail = supabaseDecoded.email;
-            client.userRole = supabaseDecoded.role || 'user';
-          }
-        }
-
-        if (!client.userId) {
-          this.logger.warn(`Client ${client.id} with invalid token`);
-          client.emit('error', { message: 'Invalid token' });
-          client.disconnect();
-          return;
-        }
-      } else {
-        client.userId = decoded.sub || decoded.userId;
-        client.userEmail = decoded.email;
-        client.userRole = decoded.role || 'user';
+      if (error || !user) {
+        this.logger.warn(`Client ${client.id} with invalid token: ${error?.message}`);
+        client.emit('error', { message: 'Invalid token' });
+        client.disconnect();
+        return;
       }
+
+      // Set user info from Supabase verification
+      client.userId = user.id;
+      client.userEmail = user.email;
+      client.userRole = 'user'; // Default role, profile check happens in operations
 
       // Track socket
       const userSocketIds = this.userSockets.get(client.userId!) || new Set();
