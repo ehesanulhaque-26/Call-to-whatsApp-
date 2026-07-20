@@ -322,3 +322,10 @@ final isWhatsAppConnectedProvider = Provider<bool>((ref) {
   final state = ref.watch(whatsAppProvider);
   return state.connection?.isConnected ?? false;
 });
+
+/// Provider for sessions list
+final sessionsProvider = FutureProvider<List<OpenWASession>>((ref) async {
+  final repository = ref.watch(whatsAppRepositoryProvider);
+  // Return empty list - actual implementation would fetch from backend
+  return [];
+});

@@ -14,6 +14,13 @@ import '../../features/settings/presentation/screens/settings_screen.dart';
 import '../../features/admin/presentation/screens/admin_dashboard_screen.dart';
 import '../../features/admin/presentation/screens/users_screen.dart';
 import '../../features/admin/presentation/screens/subscriptions_screen.dart';
+import '../../features/user/presentation/screens/user_shell.dart';
+import '../../features/user/presentation/screens/user_home_screen.dart';
+import '../../features/user/presentation/screens/user_sessions_screen.dart';
+import '../../features/user/presentation/screens/user_contacts_screen.dart';
+import '../../features/user/presentation/screens/user_notifications_screen.dart';
+import '../../features/user/presentation/screens/user_profile_screen.dart';
+import '../../features/user/presentation/screens/user_subscription_screen.dart';
 import '../services/supabase_service.dart';
 
 class AppRoutes {
@@ -30,6 +37,13 @@ class AppRoutes {
   static const String admin = '/admin';
   static const String adminUsers = '/admin/users';
   static const String adminSubscriptions = '/admin/subscriptions';
+  
+  // User routes
+  static const String sessions = '/sessions';
+  static const String contacts = '/contacts';
+  static const String notifications = '/notifications';
+  static const String profile = '/profile';
+  static const String subscription = '/subscription';
 }
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -68,6 +82,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       return null;
     },
     routes: [
+      // Auth routes
       GoRoute(
         path: AppRoutes.splash,
         name: 'splash',
@@ -106,88 +121,137 @@ final routerProvider = Provider<GoRouter>((ref) {
           },
         ),
       ),
+      
+      // User shell routes with bottom navigation
       ShellRoute(
         navigatorKey: _shellNavigatorKey,
-        builder: (context, state, child) => MainShell(child: child),
+        builder: (context, state, child) => UserShell(child: child),
         routes: [
+          // User home/dashboard
           GoRoute(
             path: AppRoutes.home,
             name: 'home',
             pageBuilder: (context, state) => CustomTransitionPage(
               key: state.pageKey,
-              child: const HomeScreen(),
+              child: const UserHomeScreen(),
               transitionsBuilder: (context, animation, secondaryAnimation, child) {
                 return FadeTransition(opacity: animation, child: child);
               },
             ),
           ),
+          // User sessions
           GoRoute(
-            path: AppRoutes.whatsApp,
-            name: 'whatsApp',
+            path: AppRoutes.sessions,
+            name: 'sessions',
             pageBuilder: (context, state) => CustomTransitionPage(
               key: state.pageKey,
-              child: const WhatsAppScreen(),
+              child: const UserSessionsScreen(),
               transitionsBuilder: (context, animation, secondaryAnimation, child) {
                 return FadeTransition(opacity: animation, child: child);
               },
             ),
           ),
+          // User contacts
           GoRoute(
-            path: AppRoutes.automations,
-            name: 'automations',
+            path: AppRoutes.contacts,
+            name: 'contacts',
             pageBuilder: (context, state) => CustomTransitionPage(
               key: state.pageKey,
-              child: const AutomationsScreen(),
+              child: const UserContactsScreen(),
               transitionsBuilder: (context, animation, secondaryAnimation, child) {
                 return FadeTransition(opacity: animation, child: child);
               },
             ),
           ),
+          // User notifications
           GoRoute(
-            path: AppRoutes.settings,
-            name: 'settings',
+            path: AppRoutes.notifications,
+            name: 'notifications',
             pageBuilder: (context, state) => CustomTransitionPage(
               key: state.pageKey,
-              child: const SettingsScreen(),
+              child: const UserNotificationsScreen(),
               transitionsBuilder: (context, animation, secondaryAnimation, child) {
                 return FadeTransition(opacity: animation, child: child);
               },
             ),
           ),
+          // User profile
           GoRoute(
-            path: AppRoutes.admin,
-            name: 'admin',
+            path: AppRoutes.profile,
+            name: 'profile',
             pageBuilder: (context, state) => CustomTransitionPage(
               key: state.pageKey,
-              child: const AdminDashboardScreen(),
+              child: const UserProfileScreen(),
               transitionsBuilder: (context, animation, secondaryAnimation, child) {
                 return FadeTransition(opacity: animation, child: child);
               },
             ),
           ),
+          // User subscription
           GoRoute(
-            path: AppRoutes.adminUsers,
-            name: 'adminUsers',
+            path: AppRoutes.subscription,
+            name: 'subscription',
             pageBuilder: (context, state) => CustomTransitionPage(
               key: state.pageKey,
-              child: const UsersScreen(),
-              transitionsBuilder: (context, animation, secondaryAnimation, child) {
-                return FadeTransition(opacity: animation, child: child);
-              },
-            ),
-          ),
-          GoRoute(
-            path: AppRoutes.adminSubscriptions,
-            name: 'adminSubscriptions',
-            pageBuilder: (context, state) => CustomTransitionPage(
-              key: state.pageKey,
-              child: const SubscriptionsScreen(),
+              child: const UserSubscriptionScreen(),
               transitionsBuilder: (context, animation, secondaryAnimation, child) {
                 return FadeTransition(opacity: animation, child: child);
               },
             ),
           ),
         ],
+      ),
+      
+      // Admin routes (outside user shell)
+      GoRoute(
+        path: AppRoutes.admin,
+        name: 'admin',
+        builder: (context, state) => const AdminDashboardScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.adminUsers,
+        name: 'adminUsers',
+        builder: (context, state) => const UsersScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.adminSubscriptions,
+        name: 'adminSubscriptions',
+        builder: (context, state) => const SubscriptionsScreen(),
+      ),
+      
+      // Legacy routes (for backward compatibility)
+      GoRoute(
+        path: AppRoutes.whatsApp,
+        name: 'whatsApp',
+        pageBuilder: (context, state) => CustomTransitionPage(
+          key: state.pageKey,
+          child: const WhatsAppScreen(),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return FadeTransition(opacity: animation, child: child);
+          },
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.automations,
+        name: 'automations',
+        pageBuilder: (context, state) => CustomTransitionPage(
+          key: state.pageKey,
+          child: const AutomationsScreen(),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return FadeTransition(opacity: animation, child: child);
+          },
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.settings,
+        name: 'settings',
+        pageBuilder: (context, state) => CustomTransitionPage(
+          key: state.pageKey,
+          child: const SettingsScreen(),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return FadeTransition(opacity: animation, child: child);
+          },
+        ),
       ),
     ],
     errorBuilder: (context, state) => Scaffold(
@@ -211,70 +275,3 @@ final routerProvider = Provider<GoRouter>((ref) {
     ),
   );
 });
-
-class MainShell extends ConsumerWidget {
-  const MainShell({required this.child, super.key});
-  final Widget child;
-
-  int _getSelectedIndex(String location) {
-    if (location.startsWith('/admin')) return 4;
-    switch (location) {
-      case '/home': return 0;
-      case '/whatsapp': return 1;
-      case '/automations': return 2;
-      case '/settings': return 3;
-      default: return 0;
-    }
-  }
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final location = GoRouterState.of(context).matchedLocation;
-    final selectedIndex = _getSelectedIndex(location);
-    final isAdmin = ref.watch(isAdminProvider);
-
-    return Scaffold(
-      body: child,
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: selectedIndex,
-        onDestinationSelected: (index) {
-          switch (index) {
-            case 0: context.go(AppRoutes.home); break;
-            case 1: context.go(AppRoutes.whatsApp); break;
-            case 2: context.go(AppRoutes.automations); break;
-            case 3: context.go(AppRoutes.settings); break;
-            case 4: context.go(AppRoutes.admin); break;
-          }
-        },
-        destinations: [
-          const NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home),
-            label: 'Home',
-          ),
-          const NavigationDestination(
-            icon: Icon(Icons.chat_bubble_outline),
-            selectedIcon: Icon(Icons.chat_bubble),
-            label: 'WhatsApp',
-          ),
-          const NavigationDestination(
-            icon: Icon(Icons.auto_awesome_outlined),
-            selectedIcon: Icon(Icons.auto_awesome),
-            label: 'Automations',
-          ),
-          const NavigationDestination(
-            icon: Icon(Icons.settings_outlined),
-            selectedIcon: Icon(Icons.settings),
-            label: 'Settings',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.admin_panel_settings_outlined),
-            selectedIcon: const Icon(Icons.admin_panel_settings),
-            label: 'Admin',
-            tooltip: isAdmin ? 'Admin Dashboard' : 'Access Restricted',
-          ),
-        ],
-      ),
-    );
-  }
-}
