@@ -8,6 +8,9 @@ async function bootstrap() {
 
   const app = await NestFactory.create(AppModule);
 
+  // Set global API prefix
+  app.setGlobalPrefix('api/v1');
+
   // Enable CORS for Flutter and WebSocket
   app.enableCors({
     origin: '*',

@@ -62,11 +62,16 @@ class WhatsAppScreen extends ConsumerWidget {
     WhatsAppState state,
     WhatsAppConnectionState connectionState,
   ) {
+    // Check if there's a QR code ready or connected session
+    final hasQrCode = state.sessions.any((s) => s.qrCode != null);
+    final hasConnectedSession = state.sessions.any((s) => s.status == WhatsAppStatus.connected);
+    final activeSession = state.activeSession;
+
     switch (connectionState) {
       case WhatsAppConnectionState.disconnected:
       case WhatsAppConnectionState.error:
         return _DisconnectedState(
-          onConnect: () => ref.read(whatsAppProvider.notifier).connect(),
+          onConnect: () => ref.read(whatsAppProvider.notifier).createSession(),
           isLoading: state.isLoading,
           error: state.error,
           openWAHealthy: state.isConnected,
@@ -75,18 +80,25 @@ class WhatsAppScreen extends ConsumerWidget {
         return const _CreatingConnectionState();
       case WhatsAppConnectionState.qrReady:
         return _QRReadyState(
-          qrCode: state.connection?.qrCode,
-          onRefresh: () => ref.read(whatsAppProvider.notifier).refreshQR(state.connection?.sessionId ?? ""),
+          qrCode: activeSession?.qrCode ?? state.connection?.qrCode,
+          onRefresh: () => ref.read(whatsAppProvider.notifier).refreshQR(activeSession?.sessionId ?? state.connection?.sessionId ?? ""),
           isLoading: state.isLoading,
         );
       case WhatsAppConnectionState.connecting:
+        if (hasQrCode) {
+          return _QRReadyState(
+            qrCode: activeSession?.qrCode ?? state.connection?.qrCode,
+            onRefresh: () => ref.read(whatsAppProvider.notifier).refreshQR(activeSession?.sessionId ?? state.connection?.sessionId ?? ""),
+            isLoading: state.isLoading,
+          );
+        }
         return const _ConnectingState();
       case WhatsAppConnectionState.connected:
         return _ConnectedState(
           connection: state.connection!,
-          onReconnect: () => ref.read(whatsAppProvider.notifier).reconnect(state.connection?.sessionId ?? ""),
-          onDisconnect: () => ref.read(whatsAppProvider.notifier).disconnect(),
-          onDelete: () => ref.read(whatsAppProvider.notifier).deleteConnection(state.connection?.sessionId ?? ""),
+          onReconnect: () => ref.read(whatsAppProvider.notifier).reconnect(activeSession?.sessionId ?? state.connection?.sessionId ?? ""),
+          onDisconnect: () => ref.read(whatsAppProvider.notifier).logout(activeSession?.sessionId ?? ""),
+          onDelete: () => ref.read(whatsAppProvider.notifier).deleteConnection(activeSession?.sessionId ?? state.connection?.sessionId ?? ""),
         );
     }
   }

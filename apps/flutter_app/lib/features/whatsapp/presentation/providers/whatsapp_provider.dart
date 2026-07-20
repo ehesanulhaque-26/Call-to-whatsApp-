@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:openwa_saas/core/services/api_client.dart';
 import 'package:openwa_saas/core/services/websocket_service.dart';
 import 'package:openwa_saas/core/services/supabase_service.dart';
 import 'package:openwa_saas/features/whatsapp/data/models/whatsapp_connection.dart';
 import 'package:openwa_saas/features/whatsapp/data/repositories/whatsapp_repository.dart';
+import 'package:dio/dio.dart';
 
 /// Session status enum
 enum WhatsAppStatus {
@@ -204,11 +206,13 @@ class WhatsAppNotifier extends StateNotifier<WhatsAppState> {
     _init();
   }
 
+  ApiClient get _apiClient => ref.read(apiClientProvider);
+
   void _init() {
     _connectionSub = _wsService.connectionStateStream.listen((connState) {
       state = state.copyWith(connectionState: connState);
       if (connState == ConnectionState.connected) {
-        _wsService.getSessions();
+        loadSessions();
       }
     });
 
@@ -315,6 +319,7 @@ class WhatsAppNotifier extends StateNotifier<WhatsAppState> {
     );
   }
 
+  /// Connect to WebSocket and start listening for events
   Future<void> connect() async {
     final supabaseService = ref.read(supabaseServiceProvider);
     final user = supabaseService.currentUser;
@@ -332,51 +337,378 @@ class WhatsAppNotifier extends StateNotifier<WhatsAppState> {
 
     state = state.copyWith(connectionState: ConnectionState.connecting);
     _wsService.connect(session.accessToken);
+    
+    // Also load existing sessions via REST API
+    await loadSessions();
   }
 
+  /// Disconnect WebSocket
   void disconnect() {
     _wsService.disconnect();
+    state = state.copyWith(connectionState: ConnectionState.disconnected);
   }
 
-  Future<void> createSession({String? name}) async {
-    if (!_wsService.isConnected) {
-      await connect();
+  /// Load sessions from backend via REST API
+  Future<void> loadSessions() async {
+    try {
+      state = state.copyWith(isLoading: true);
+      final response = await _apiClient.get<Map<String, dynamic>>('/sessions');
+      
+      if (response.data != null && response.data!['sessions'] != null) {
+        final sessionsList = (response.data!['sessions'] as List)
+            .map((s) => WhatsAppSession.fromJson(s as Map<String, dynamic>))
+            .toList();
+        
+        state = state.copyWith(
+          sessions: sessionsList,
+          isLoading: false,
+        );
+        
+        // Set first session as active if none set
+        if (state.activeSession == null && sessionsList.isNotEmpty) {
+          state = state.copyWith(activeSession: sessionsList.first);
+        }
+      } else {
+        state = state.copyWith(isLoading: false);
+      }
+    } on DioException catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: e.message ?? 'Failed to load sessions',
+      );
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: 'Failed to load sessions: $e',
+      );
     }
-    state = state.copyWith(isLoading: true);
-    _wsService.createSession(sessionName: name);
-    state = state.copyWith(isLoading: false);
   }
 
-  void getQRCode(String sessionId) {
-    _wsService.getQR(sessionId);
+  /// Create a new WhatsApp session via REST API
+  Future<WhatsAppSession?> createSession({String? name}) async {
+    try {
+      state = state.copyWith(isLoading: true, error: null);
+      
+      final response = await _apiClient.post<Map<String, dynamic>>(
+        '/sessions',
+        data: {'sessionName': name},
+      );
+      
+      if (response.data != null) {
+        final session = WhatsAppSession.fromJson(response.data!);
+        
+        // Add to sessions list
+        final sessions = List<WhatsAppSession>.from(state.sessions)..add(session);
+        state = state.copyWith(
+          sessions: sessions,
+          activeSession: session,
+          isLoading: false,
+        );
+        
+        // After creating session, fetch QR code
+        await getQRCode(session.sessionId);
+        
+        return session;
+      }
+      
+      state = state.copyWith(isLoading: false);
+      return null;
+    } on DioException catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: e.message ?? 'Failed to create session',
+      );
+      return null;
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: 'Failed to create session: $e',
+      );
+      return null;
+    }
   }
 
-  void refreshQR(String sessionId) {
-    _wsService.getQR(sessionId);
+  /// Get QR code for a session via REST API
+  Future<String?> getQRCode(String sessionId) async {
+    try {
+      state = state.copyWith(isLoading: true, error: null);
+      
+      final response = await _apiClient.get<Map<String, dynamic>>(
+        '/sessions/$sessionId/qr',
+      );
+      
+      if (response.data != null && response.data!['qr'] != null) {
+        final qr = response.data!['qr'] as String;
+        
+        // Update session with QR code
+        _updateSessionStatus(sessionId, WhatsAppStatus.qrReady, qrCode: qr);
+        
+        state = state.copyWith(isLoading: false);
+        return qr;
+      }
+      
+      state = state.copyWith(isLoading: false);
+      return null;
+    } on DioException catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: e.message ?? 'Failed to get QR code',
+      );
+      return null;
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: 'Failed to get QR code: $e',
+      );
+      return null;
+    }
   }
 
-  void initSession(String sessionId) {
-    _wsService.initSession(sessionId);
+  /// Refresh QR code
+  Future<void> refreshQR(String sessionId) async {
+    await getQRCode(sessionId);
   }
 
-  void reconnect(String sessionId) {
-    _wsService.reconnect(sessionId);
+  /// Initialize session
+  Future<void> initSession(String sessionId) async {
+    try {
+      state = state.copyWith(isLoading: true, error: null);
+      
+      await _apiClient.post<Map<String, dynamic>>(
+        '/sessions/$sessionId/init',
+      );
+      
+      // Refresh status
+      await getSessionStatus(sessionId);
+      
+      state = state.copyWith(isLoading: false);
+    } on DioException catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: e.message ?? 'Failed to initialize session',
+      );
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: 'Failed to initialize session: $e',
+      );
+    }
   }
 
-  void logout(String sessionId) {
-    _wsService.logout(sessionId);
+  /// Get session status
+  Future<void> getSessionStatus(String sessionId) async {
+    try {
+      final response = await _apiClient.get<Map<String, dynamic>>(
+        '/sessions/$sessionId/status',
+      );
+      
+      if (response.data != null) {
+        final statusData = response.data!;
+        final state_str = statusData['state'] as String? ?? 'DISCONNECTED';
+        final qr = statusData['qr'] as String?;
+        final phone = statusData['phone'] as String?;
+        
+        final status = WhatsAppSession._parseStatus(state_str);
+        _updateSessionStatus(sessionId, status, qrCode: qr, phone: phone);
+      }
+    } catch (e) {
+      // Silently fail for status check
+    }
   }
 
-  void destroySession(String sessionId) {
-    _wsService.destroySession(sessionId);
+  /// Reconnect a session
+  Future<void> reconnect(String sessionId) async {
+    try {
+      state = state.copyWith(isLoading: true, error: null);
+      _updateSessionStatus(sessionId, WhatsAppStatus.reconnecting);
+      
+      await _apiClient.post<Map<String, dynamic>>(
+        '/sessions/$sessionId/reconnect',
+      );
+      
+      // Poll for status updates
+      _pollSessionStatus(sessionId);
+      
+      state = state.copyWith(isLoading: false);
+    } on DioException catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: e.message ?? 'Failed to reconnect',
+      );
+      _updateSessionStatus(sessionId, WhatsAppStatus.error);
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: 'Failed to reconnect: $e',
+      );
+      _updateSessionStatus(sessionId, WhatsAppStatus.error);
+    }
   }
 
+  Timer? _statusPollTimer;
+  
+  void _pollSessionStatus(String sessionId) {
+    _statusPollTimer?.cancel();
+    _statusPollTimer = Timer.periodic(const Duration(seconds: 3), (timer) async {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      
+      final session = state.sessions.firstWhere(
+        (s) => s.sessionId == sessionId,
+        orElse: () => WhatsAppSession(sessionId: sessionId, status: WhatsAppStatus.disconnected),
+      );
+      
+      if (session.status == WhatsAppStatus.connected || session.status == WhatsAppStatus.error) {
+        timer.cancel();
+        return;
+      }
+      
+      await getSessionStatus(sessionId);
+    });
+  }
+
+  /// Logout a session (disconnect but keep session data)
+  Future<void> logout(String sessionId) async {
+    try {
+      state = state.copyWith(isLoading: true, error: null);
+      _updateSessionStatus(sessionId, WhatsAppStatus.disconnected);
+      
+      await _apiClient.post<Map<String, dynamic>>(
+        '/sessions/$sessionId/logout',
+      );
+      
+      state = state.copyWith(isLoading: false);
+    } on DioException catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: e.message ?? 'Failed to logout',
+      );
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: 'Failed to logout: $e',
+      );
+    }
+  }
+
+  /// Destroy a session completely (delete)
+  Future<void> destroySession(String sessionId) async {
+    try {
+      state = state.copyWith(isLoading: true, error: null);
+      
+      await _apiClient.delete<Map<String, dynamic>>(
+        '/sessions/$sessionId',
+      );
+      
+      // Remove from sessions list
+      final sessions = List<WhatsAppSession>.from(state.sessions);
+      sessions.removeWhere((s) => s.sessionId == sessionId);
+      
+      state = state.copyWith(
+        sessions: sessions,
+        activeSession: state.activeSession?.sessionId == sessionId ? null : state.activeSession,
+        isLoading: false,
+      );
+    } on DioException catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: e.message ?? 'Failed to delete session',
+      );
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: 'Failed to delete session: $e',
+      );
+    }
+  }
+
+  /// Delete connection (alias for destroySession)
   void deleteConnection(String sessionId) {
-    _wsService.destroySession(sessionId);
+    destroySession(sessionId);
   }
 
-  void syncContacts(String sessionId) {
-    _wsService.syncContacts(sessionId);
+  /// Sync contacts
+  Future<void> syncContacts(String sessionId) async {
+    try {
+      state = state.copyWith(isLoading: true, error: null);
+      
+      await _apiClient.post<Map<String, dynamic>>(
+        '/sessions/$sessionId/sync-contacts',
+      );
+      
+      state = state.copyWith(isLoading: false);
+    } on DioException catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: e.message ?? 'Failed to sync contacts',
+      );
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: 'Failed to sync contacts: $e',
+      );
+    }
+  }
+
+  /// Send text message
+  Future<bool> sendTextMessage(String sessionId, String to, String text) async {
+    try {
+      state = state.copyWith(error: null);
+      
+      await _apiClient.post<Map<String, dynamic>>(
+        '/sessions/$sessionId/send-text',
+        data: {'to': to, 'text': text},
+      );
+      
+      return true;
+    } on DioException catch (e) {
+      state = state.copyWith(error: e.message ?? 'Failed to send message');
+      return false;
+    } catch (e) {
+      state = state.copyWith(error: 'Failed to send message: $e');
+      return false;
+    }
+  }
+
+  /// Send media message
+  Future<bool> sendMediaMessage(String sessionId, String to, String mediaUrl, {String? caption}) async {
+    try {
+      state = state.copyWith(error: null);
+      
+      await _apiClient.post<Map<String, dynamic>>(
+        '/sessions/$sessionId/send-media',
+        data: {'to': to, 'mediaUrl': mediaUrl, 'caption': caption},
+      );
+      
+      return true;
+    } on DioException catch (e) {
+      state = state.copyWith(error: e.message ?? 'Failed to send media');
+      return false;
+    } catch (e) {
+      state = state.copyWith(error: 'Failed to send media: $e');
+      return false;
+    }
+  }
+
+  void _updateSessionStatus(String sessionId, WhatsAppStatus status, {String? qrCode, String? phone}) {
+    final index = state.sessions.indexWhere((s) => s.sessionId == sessionId);
+    if (index < 0) return;
+
+    final updatedSession = state.sessions[index].copyWith(
+      status: status,
+      qrCode: qrCode,
+      phone: phone,
+    );
+
+    final sessions = List<WhatsAppSession>.from(state.sessions);
+    sessions[index] = updatedSession;
+
+    state = state.copyWith(
+      sessions: sessions,
+      activeSession: state.activeSession?.sessionId == sessionId ? updatedSession : state.activeSession,
+    );
   }
 
   void setActiveSession(WhatsAppSession? session) {
@@ -389,6 +721,7 @@ class WhatsAppNotifier extends StateNotifier<WhatsAppState> {
 
   @override
   void dispose() {
+    _statusPollTimer?.cancel();
     _connectionSub?.cancel();
     _eventSub?.cancel();
     _qrSub?.cancel();

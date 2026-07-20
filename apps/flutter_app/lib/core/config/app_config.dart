@@ -3,10 +3,10 @@
 class AppConfig {
   AppConfig._();
 
-  /// API Base URL - Backend REST API
+  /// API Base URL - Backend REST API (includes /api/v1 prefix)
   static const String apiBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://localhost:3000',
+    defaultValue: 'http://localhost:3000/api/v1',
   );
 
   /// WebSocket URL - Backend WebSocket endpoint

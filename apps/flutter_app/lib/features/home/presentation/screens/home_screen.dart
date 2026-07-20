@@ -501,18 +501,26 @@ class HomeScreen extends ConsumerWidget {
   void _showLogoutDialog(BuildContext context, WidgetRef ref) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Logout'),
         content: const Text('Are you sure you want to logout?'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Cancel'),
           ),
           ElevatedButton(
             onPressed: () async {
-              Navigator.pop(context);
+              // Pop dialog first
+              Navigator.pop(dialogContext);
+              
+              // Perform logout
               await ref.read(authProvider.notifier).logout();
+              
+              // Clear WhatsApp provider state
+              ref.read(whatsAppProvider.notifier).disconnect();
+              
+              // Navigate to login
               if (context.mounted) {
                 context.go(AppRoutes.login);
               }
