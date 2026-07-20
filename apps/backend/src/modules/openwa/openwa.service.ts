@@ -42,13 +42,13 @@ export enum SessionStatus {
 
 // QR Code response from OpenWA
 export interface OpenWAQRCodeResponse {
-  qrCode: string;  // NOTE: Field is 'qrCode', not 'qr'
+  qrCode: string; // NOTE: Field is 'qrCode', not 'qr'
   status: SessionStatus;
 }
 
 // Create session request body (OpenWA expects 'name', not 'sessionId')
 export interface CreateSessionRequest {
-  name: string;  // Required: alphanumeric and hyphens, 3-50 chars
+  name: string; // Required: alphanumeric and hyphens, 3-50 chars
   config?: Record<string, unknown>;
   proxyUrl?: string;
   proxyType?: 'http' | 'https' | 'socks4' | 'socks5';
@@ -56,9 +56,9 @@ export interface CreateSessionRequest {
 
 // Send text message request body (OpenWA expects 'chatId', not 'to')
 export interface SendTextMessageRequest {
-  chatId: string;  // WhatsApp chat ID (phone@c.us or groupId@g.us)
-  text: string;    // Message content (max 4096 chars)
-  mentions?: string[];  // Optional mentions
+  chatId: string; // WhatsApp chat ID (phone@c.us or groupId@g.us)
+  text: string; // Message content (max 4096 chars)
+  mentions?: string[]; // Optional mentions
 }
 
 // Send media message request body
@@ -107,16 +107,16 @@ export class OpenWAService {
     this.logger.warn('========================================');
     this.logger.warn('[OpenWA] SERVICE INITIALIZATION STARTING');
     this.logger.warn('[OpenWA] Environment Configuration:');
-    
+
     // Get OpenWA URL from config or environment
     const openwaUrl =
       this.configService.get<string>('OPENWA_URL') ||
       process.env.OPENWA_URL ||
       'https://openwa-production-d8f8.up.railway.app';
-    
+
     // Get OpenWA API key
     this.apiKey = this.configService.get<string>('OPENWA_API_KEY') || process.env.OPENWA_API_KEY;
-    
+
     this.baseURL = openwaUrl;
 
     this.logger.warn(`[OpenWA]   OPENWA_URL: ${openwaUrl}`);
@@ -206,7 +206,9 @@ export class OpenWAService {
       const response = axiosError.response;
 
       this.logger.error(`[OpenWA] FAILED after ${duration}ms`);
-      this.logger.error(`[OpenWA] HTTP ${response?.status || 'N/A'}: ${response?.statusText || axiosError.message}`);
+      this.logger.error(
+        `[OpenWA] HTTP ${response?.status || 'N/A'}: ${response?.statusText || axiosError.message}`,
+      );
       if (response?.data) {
         this.logger.error(`[OpenWA] Error Response: ${JSON.stringify(response.data)}`);
       }
@@ -218,7 +220,7 @@ export class OpenWAService {
         const message = errorData.message || errorData.error || axiosError.message;
         throw new HttpException(message, response.status);
       }
-      
+
       throw new HttpException(
         `OpenWA request failed: ${axiosError.message}`,
         HttpStatus.BAD_GATEWAY,
@@ -238,7 +240,7 @@ export class OpenWAService {
   // =====================================================
   // SESSION MANAGEMENT
   // =====================================================
-  
+
   // Create a new WhatsApp session
   // OpenWA: POST /api/sessions
   // Body: { name: string, config?: object, proxyUrl?: string, proxyType?: string }
@@ -246,7 +248,7 @@ export class OpenWAService {
   async createSession(name: string, config?: Record<string, unknown>): Promise<OpenWASession> {
     const payload: CreateSessionRequest = { name };
     if (config) payload.config = config;
-    
+
     this.logger.warn(`[OpenWA] CREATE SESSION: name="${name}"`);
     return this.request<OpenWASession>('POST', '/api/sessions', payload);
   }
@@ -308,7 +310,7 @@ export class OpenWAService {
   // =====================================================
   // MESSAGING
   // =====================================================
-  
+
   // Send text message
   // OpenWA: POST /api/sessions/:sessionId/send-text
   // Body: { chatId: string, text: string, mentions?: string[] }
@@ -348,7 +350,7 @@ export class OpenWAService {
   // =====================================================
   // CHATS & CONTACTS
   // =====================================================
-  
+
   // Get all chats
   // OpenWA: GET /api/sessions/:sessionId/chats
   // Response: ChatSummary[]
@@ -371,7 +373,7 @@ export class OpenWAService {
   // =====================================================
   // GROUPS
   // =====================================================
-  
+
   // Get all groups
   // OpenWA: GET /api/sessions/:sessionId/groups
   // Response: { id: string, name: string, linkedParentJID?: string }[]
