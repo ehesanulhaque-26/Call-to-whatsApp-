@@ -11,55 +11,49 @@ class AuthNotifier extends StateNotifier<AuthState> {
   final AuthRepository _repository;
   final SupabaseService _supabaseService;
 
-  /// Check authentication status
+  /// Check authentication status - fetches profile from Supabase
   Future<void> checkAuthStatus() async {
-    developer.log('AuthNotifier: checkAuthStatus called', name: 'Auth');
+    developer.log('[AuthNotifier] CHECK_AUTH: Starting', name: 'Auth');
 
     final user = _supabaseService.currentUser;
-    developer.log('AuthNotifier: currentUser = ${user?.id ?? 'null'}', name: 'Auth');
-    
-    if (user != null) {
-      developer.log('AuthNotifier: User authenticated - userId=${user.id}, email=${user.email}', name: 'Auth');
-
-      // Get current user profile from Supabase
-      final userProfile = await _repository.getCurrentUser();
-      
-      if (userProfile != null) {
-        developer.log('AuthNotifier: Profile fetched - role=${userProfile.role}, name=${userProfile.name}', name: 'Auth');
-
-        state = AuthState(
-          isAuthenticated: true,
-          userId: user.id,
-          email: userProfile.email,
-          name: userProfile.name,
-          role: userProfile.role,
-        );
-        
-        developer.log('AuthNotifier: AuthState updated - isAuthenticated=${state.isAuthenticated}, role=${state.role}', name: 'Auth');
-      } else {
-        developer.log('AuthNotifier: getCurrentUser returned null - using auth user data', name: 'Auth');
-
-        state = AuthState(
-          isAuthenticated: true,
-          userId: user.id,
-          email: user.email ?? '',
-          name: user.userMetadata?['name'] ?? '',
-          role: 'user',
-        );
-        
-        developer.log('AuthNotifier: AuthState updated with defaults - role=${state.role}', name: 'Auth');
-      }
-    } else {
-      developer.log('AuthNotifier: No authenticated user in Supabase', name: 'Auth');
+    if (user == null) {
+      developer.log('[AuthNotifier] CHECK_AUTH: No user, clearing state', name: 'Auth');
+      state = const AuthState();
+      return;
     }
+
+    developer.log('[AuthNotifier] CHECK_AUTH: User=${user.id}', name: 'Auth');
+
+    final profile = await _repository.getCurrentUser();
+    
+    if (profile != null) {
+      state = AuthState(
+        isAuthenticated: true,
+        userId: user.id,
+        email: profile.email,
+        name: profile.name,
+        role: profile.role,
+      );
+    } else {
+      // No profile found, use defaults
+      state = AuthState(
+        isAuthenticated: true,
+        userId: user.id,
+        email: user.email ?? '',
+        name: user.userMetadata?['name'] ?? '',
+        role: 'user',
+      );
+    }
+    
+    developer.log('[AuthNotifier] CHECK_AUTH: Done, isAuth=${state.isAuthenticated}, role=${state.role}', name: 'Auth');
   }
 
-  /// Login
+  /// Login with email and password
   Future<bool> login({
     required String email,
     required String password,
   }) async {
-    developer.log('AuthNotifier: Login started for $email', name: 'Auth');
+    developer.log('[AuthNotifier] LOGIN: Starting for $email', name: 'Auth');
     state = state.copyWith(isLoading: true, error: null);
 
     try {
@@ -68,11 +62,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
         password: password,
       );
 
-      developer.log('AuthNotifier: Repository response - success=${response.success}, userId=${response.userId}', name: 'Auth');
+      developer.log('[AuthNotifier] LOGIN: Response success=${response.success}, userId=${response.userId}', name: 'Auth');
 
       if (response.success && response.userId != null) {
-        developer.log('AuthNotifier: Login successful - userId=${response.userId}, role=${response.role}', name: 'Auth');
-
         state = AuthState(
           isAuthenticated: true,
           userId: response.userId,
@@ -80,19 +72,17 @@ class AuthNotifier extends StateNotifier<AuthState> {
           name: response.name ?? '',
           role: response.role ?? 'user',
         );
-
-        developer.log('AuthNotifier: AuthState after login - isAuthenticated=${state.isAuthenticated}, role=${state.role}', name: 'Auth');
+        developer.log('[AuthNotifier] LOGIN: Success, role=${state.role}', name: 'Auth');
         return true;
       } else {
-        developer.log('AuthNotifier: Login failed - ${response.error}', name: 'Auth');
         state = state.copyWith(
           isLoading: false,
           error: response.error ?? 'Login failed',
         );
         return false;
       }
-    } catch (e, stackTrace) {
-      developer.log('AuthNotifier: Login exception - $e\n$stackTrace', name: 'Auth');
+    } catch (e, stack) {
+      developer.log('[AuthNotifier] LOGIN: Exception: $e\n$stack', name: 'Auth');
       state = state.copyWith(
         isLoading: false,
         error: e.toString(),
@@ -101,7 +91,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  /// Register
+  /// Register new user
   Future<bool> register({
     required String name,
     required String email,
@@ -110,8 +100,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = state.copyWith(isLoading: true, error: null);
 
     try {
-      developer.log('AuthNotifier: Registration attempt for $email', name: 'Auth');
-
       final response = await _repository.register(
         name: name,
         email: email,
@@ -119,11 +107,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
       );
 
       if (response.success) {
-        developer.log('AuthNotifier: Registration successful', name: 'Auth');
         state = state.copyWith(isLoading: false);
         return true;
       } else {
-        developer.log('AuthNotifier: Registration failed - ${response.error}', name: 'Auth');
         state = state.copyWith(
           isLoading: false,
           error: response.error ?? 'Registration failed',
@@ -131,7 +117,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
         return false;
       }
     } catch (e) {
-      developer.log('AuthNotifier: Registration exception - $e', name: 'Auth');
       state = state.copyWith(
         isLoading: false,
         error: e.toString(),
@@ -140,7 +125,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  /// Forgot password
+  /// Request password reset
   Future<bool> forgotPassword({required String email}) async {
     state = state.copyWith(isLoading: true, error: null);
 
@@ -159,15 +144,13 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   /// Logout
   Future<void> logout() async {
-    developer.log('AuthNotifier: Logout initiated', name: 'Auth');
-
+    developer.log('[AuthNotifier] LOGOUT: Starting', name: 'Auth');
     state = state.copyWith(isLoading: true);
 
     await _repository.logout();
 
     state = const AuthState();
-
-    developer.log('AuthNotifier: Logout complete, state cleared', name: 'Auth');
+    developer.log('[AuthNotifier] LOGOUT: Done', name: 'Auth');
   }
 }
 
@@ -178,7 +161,7 @@ final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
   return AuthNotifier(repository, supabaseService);
 });
 
-/// Check if user is admin
+/// Provider to check if current user is admin
 final isAdminProvider = Provider<bool>((ref) {
   final authState = ref.watch(authProvider);
   return authState.role == 'admin';

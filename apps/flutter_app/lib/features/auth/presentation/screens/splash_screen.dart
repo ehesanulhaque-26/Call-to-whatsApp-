@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/router/app_router.dart';
+import '../../../../core/services/supabase_service.dart';
 import '../../../../core/theme/app_tokens.dart';
 import '../providers/auth_provider.dart';
 
@@ -52,37 +53,44 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     await Future.delayed(const Duration(seconds: 2));
     if (!mounted || _hasNavigated) return;
 
-    developer.log('SplashScreen: Starting auth check', name: 'Auth');
+    developer.log('[Splash] Starting navigation', name: 'Auth');
 
-    try {
-      // Check authentication status and fetch profile
-      await ref.read(authProvider.notifier).checkAuthStatus();
-    } catch (e) {
-      developer.log('SplashScreen: checkAuthStatus exception - $e', name: 'Auth');
-    }
+    // Check if there's a session
+    final hasSession = SupabaseService.instance.currentSession != null;
+    developer.log('[Splash] Has session: $hasSession', name: 'Auth');
 
     if (!mounted || _hasNavigated) return;
 
-    final authState = ref.read(authProvider);
-    final isLoggedIn = authState.isAuthenticated;
-    final isAdmin = authState.role == 'admin';
-    final role = authState.role ?? 'unknown';
-
-    developer.log('SplashScreen: Auth complete - isLoggedIn=$isLoggedIn, isAdmin=$isAdmin, role=$role', name: 'Auth');
-
-    // Always navigate, even if not authenticated
-    if (isLoggedIn) {
+    if (hasSession) {
+      // User has a session - fetch profile and navigate based on role
+      developer.log('[Splash] Fetching profile...', name: 'Auth');
+      
+      try {
+        await ref.read(authProvider.notifier).checkAuthStatus();
+      } catch (e) {
+        developer.log('[Splash] Profile fetch error: $e', name: 'Auth');
+      }
+      
+      if (!mounted || _hasNavigated) return;
+      
+      final authState = ref.read(authProvider);
+      final isAdmin = authState.role == 'admin';
+      
+      developer.log('[Splash] Profile loaded, role=${authState.role}, isAdmin=$isAdmin', name: 'Auth');
+      
       _hasNavigated = true;
+      
       if (isAdmin) {
-        developer.log('SplashScreen: Navigating to Admin Dashboard', name: 'Auth');
+        developer.log('[Splash] Navigating to /admin', name: 'Auth');
         context.go(AppRoutes.admin);
       } else {
-        developer.log('SplashScreen: Navigating to User Home', name: 'Auth');
+        developer.log('[Splash] Navigating to /home', name: 'Auth');
         context.go(AppRoutes.home);
       }
     } else {
+      // No session - go to login
+      developer.log('[Splash] No session, navigating to /login', name: 'Auth');
       _hasNavigated = true;
-      developer.log('SplashScreen: Navigating to Login', name: 'Auth');
       context.go(AppRoutes.login);
     }
   }

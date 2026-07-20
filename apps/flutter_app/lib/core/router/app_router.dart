@@ -37,41 +37,31 @@ final _shellNavigatorKey = GlobalKey<NavigatorState>();
 
 final routerProvider = Provider<GoRouter>((ref) {
   final supabaseService = ref.watch(supabaseServiceProvider);
-  final authState = ref.watch(authProvider);
 
   return GoRouter(
     navigatorKey: _rootNavigatorKey,
     initialLocation: AppRoutes.splash,
-    redirect: (context, state) async {
+    redirect: (context, state) {
       final isLoggedIn = supabaseService.isAuthenticated;
       final isAuthRoute = state.matchedLocation == AppRoutes.login ||
           state.matchedLocation == AppRoutes.register ||
           state.matchedLocation == AppRoutes.forgotPassword ||
           state.matchedLocation == AppRoutes.splash;
 
-      final isAdminRoute = state.matchedLocation.startsWith('/admin');
-      final isAdmin = authState.role == 'admin';
-
-      developer.log('Router: isLoggedIn=$isLoggedIn, isAdmin=$isAdmin, location=${state.matchedLocation}', name: 'Router');
-
       // Skip redirect on splash screen
-      if (state.matchedLocation == AppRoutes.splash) return null;
+      if (state.matchedLocation == AppRoutes.splash) {
+        return null;
+      }
 
       // Redirect unauthenticated users to login
       if (!isLoggedIn && !isAuthRoute) {
-        developer.log('Router: Redirecting to login (unauthenticated)', name: 'Router');
+        developer.log('[Router] Redirect to login - not authenticated', name: 'Router');
         return AppRoutes.login;
       }
 
       // Redirect authenticated users away from auth routes
       if (isLoggedIn && isAuthRoute) {
-        developer.log('Router: Redirecting to home (authenticated)', name: 'Router');
-        return AppRoutes.home;
-      }
-
-      // Protect admin routes - redirect non-admins to home
-      if (isAdminRoute && !isAdmin) {
-        developer.log('Router: Blocking admin route access for non-admin', name: 'Router');
+        developer.log('[Router] Redirect to home - already authenticated', name: 'Router');
         return AppRoutes.home;
       }
 
@@ -242,8 +232,6 @@ class MainShell extends ConsumerWidget {
     final location = GoRouterState.of(context).matchedLocation;
     final selectedIndex = _getSelectedIndex(location);
     final isAdmin = ref.watch(isAdminProvider);
-
-    developer.log('MainShell: isAdmin=$isAdmin, location=$location', name: 'Router');
 
     return Scaffold(
       body: child,
