@@ -11,7 +11,7 @@ env:
   NODE_VERSION: '22'
   SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
   SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-  BACKEND_URL: 'https://openwa-production-d8f8.up.railway.app'
+  BACKEND_URL: 'https://call-to-whatsapp-production.up.railway.app'
 
 jobs:
   flutter-analyze:

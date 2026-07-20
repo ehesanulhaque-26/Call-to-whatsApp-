@@ -147,6 +147,7 @@ class WhatsAppState {
   final ConnectionState connectionState;
   final String? error;
   final bool isLoading;
+  final bool? serverHealthy; // null = unknown, true = healthy, false = unhealthy
 
   WhatsAppState({
     this.sessions = const [],
@@ -154,6 +155,7 @@ class WhatsAppState {
     this.connectionState = ConnectionState.disconnected,
     this.error,
     this.isLoading = false,
+    this.serverHealthy,
   });
 
   /// Get primary connection (for backward compatibility)
@@ -169,7 +171,7 @@ class WhatsAppState {
 
   /// Check if OpenWA is healthy (for backward compatibility)
   bool get openWAHealthy {
-    return connectionState == ConnectionState.connected;
+    return serverHealthy ?? false;
   }
 
   /// Check if connected (for backward compatibility)
@@ -183,6 +185,7 @@ class WhatsAppState {
     ConnectionState? connectionState,
     String? error,
     bool? isLoading,
+    bool? serverHealthy,
   }) {
     return WhatsAppState(
       sessions: sessions ?? this.sessions,
@@ -190,6 +193,7 @@ class WhatsAppState {
       connectionState: connectionState ?? this.connectionState,
       error: error,
       isLoading: isLoading ?? this.isLoading,
+      serverHealthy: serverHealthy ?? this.serverHealthy,
     );
   }
 }
@@ -222,6 +226,27 @@ class WhatsAppNotifier extends StateNotifier<WhatsAppState> {
     _errorSub = _wsService.errorStream.listen((error) {
       state = state.copyWith(error: error);
     });
+
+    // Check server health on init
+    checkServerHealth();
+  }
+
+  /// Check server health by calling the health endpoint
+  Future<void> checkServerHealth() async {
+    try {
+      final response = await _apiClient.get<Map<String, dynamic>>('/health');
+      if (response.statusCode == 200 && response.data != null) {
+        final data = response.data!;
+        final status = data['status'] as String?;
+        final openwaService = data['services']?['openwa'] as Map<String, dynamic>?;
+        final isHealthy = status == 'healthy' && openwaService?['status'] == 'up';
+        state = state.copyWith(serverHealthy: isHealthy);
+      } else {
+        state = state.copyWith(serverHealthy: false);
+      }
+    } catch (e) {
+      state = state.copyWith(serverHealthy: false);
+    }
   }
 
   void _handleSessionEvent(SessionEvent event) {
@@ -353,7 +378,7 @@ class WhatsAppNotifier extends StateNotifier<WhatsAppState> {
   Future<void> loadSessions() async {
     try {
       state = state.copyWith(isLoading: true);
-      final response = await _apiClient.get<Map<String, dynamic>>('/sessions');
+      final response = await _apiClient.get<Map<String, dynamic>>('/openwa/sessions');
       
       if (response.data != null && response.data!['sessions'] != null) {
         final sessionsList = (response.data!['sessions'] as List)
@@ -391,7 +416,7 @@ class WhatsAppNotifier extends StateNotifier<WhatsAppState> {
       state = state.copyWith(isLoading: true, error: null);
       
       final response = await _apiClient.post<Map<String, dynamic>>(
-        '/sessions',
+        '/openwa/sessions',
         data: {'sessionName': name},
       );
       
@@ -435,7 +460,7 @@ class WhatsAppNotifier extends StateNotifier<WhatsAppState> {
       state = state.copyWith(isLoading: true, error: null);
       
       final response = await _apiClient.get<Map<String, dynamic>>(
-        '/sessions/$sessionId/qr',
+        '/openwa/sessions/$sessionId/qr',
       );
       
       if (response.data != null && response.data!['qr'] != null) {
@@ -470,37 +495,18 @@ class WhatsAppNotifier extends StateNotifier<WhatsAppState> {
     await getQRCode(sessionId);
   }
 
-  /// Initialize session
+  /// Initialize session (WebSocket-based, no REST call needed)
   Future<void> initSession(String sessionId) async {
-    try {
-      state = state.copyWith(isLoading: true, error: null);
-      
-      await _apiClient.post<Map<String, dynamic>>(
-        '/sessions/$sessionId/init',
-      );
-      
-      // Refresh status
-      await getSessionStatus(sessionId);
-      
-      state = state.copyWith(isLoading: false);
-    } on DioException catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: e.message ?? 'Failed to initialize session',
-      );
-    } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: 'Failed to initialize session: $e',
-      );
-    }
+    // Session initialization is handled via WebSocket
+    // Just refresh the status to get QR code
+    await getSessionStatus(sessionId);
   }
 
   /// Get session status
   Future<void> getSessionStatus(String sessionId) async {
     try {
       final response = await _apiClient.get<Map<String, dynamic>>(
-        '/sessions/$sessionId/status',
+        '/openwa/sessions/$sessionId/status',
       );
       
       if (response.data != null) {
@@ -524,7 +530,7 @@ class WhatsAppNotifier extends StateNotifier<WhatsAppState> {
       _updateSessionStatus(sessionId, WhatsAppStatus.reconnecting);
       
       await _apiClient.post<Map<String, dynamic>>(
-        '/sessions/$sessionId/reconnect',
+        '/openwa/sessions/$sessionId/reconnect',
       );
       
       // Poll for status updates
@@ -577,7 +583,7 @@ class WhatsAppNotifier extends StateNotifier<WhatsAppState> {
       _updateSessionStatus(sessionId, WhatsAppStatus.disconnected);
       
       await _apiClient.post<Map<String, dynamic>>(
-        '/sessions/$sessionId/logout',
+        '/openwa/sessions/$sessionId/logout',
       );
       
       state = state.copyWith(isLoading: false);
@@ -600,7 +606,7 @@ class WhatsAppNotifier extends StateNotifier<WhatsAppState> {
       state = state.copyWith(isLoading: true, error: null);
       
       await _apiClient.delete<Map<String, dynamic>>(
-        '/sessions/$sessionId',
+        '/openwa/sessions/$sessionId',
       );
       
       // Remove from sessions list
@@ -636,7 +642,7 @@ class WhatsAppNotifier extends StateNotifier<WhatsAppState> {
       state = state.copyWith(isLoading: true, error: null);
       
       await _apiClient.post<Map<String, dynamic>>(
-        '/sessions/$sessionId/sync-contacts',
+        '/openwa/sessions/$sessionId/sync-contacts',
       );
       
       state = state.copyWith(isLoading: false);
@@ -659,7 +665,7 @@ class WhatsAppNotifier extends StateNotifier<WhatsAppState> {
       state = state.copyWith(error: null);
       
       await _apiClient.post<Map<String, dynamic>>(
-        '/sessions/$sessionId/send-text',
+        '/openwa/sessions/$sessionId/send-text',
         data: {'to': to, 'text': text},
       );
       
@@ -679,7 +685,7 @@ class WhatsAppNotifier extends StateNotifier<WhatsAppState> {
       state = state.copyWith(error: null);
       
       await _apiClient.post<Map<String, dynamic>>(
-        '/sessions/$sessionId/send-media',
+        '/openwa/sessions/$sessionId/send-media',
         data: {'to': to, 'mediaUrl': mediaUrl, 'caption': caption},
       );
       

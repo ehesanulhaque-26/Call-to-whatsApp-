@@ -73,7 +73,7 @@ class WhatsAppScreen extends ConsumerWidget {
           onConnect: () => ref.read(whatsAppProvider.notifier).createSession(),
           isLoading: state.isLoading,
           error: state.error,
-          openWAHealthy: state.isConnected,
+          openWAHealthy: state.openWAHealthy,
         );
       case WhatsAppConnectionState.creating:
         return const _CreatingConnectionState();

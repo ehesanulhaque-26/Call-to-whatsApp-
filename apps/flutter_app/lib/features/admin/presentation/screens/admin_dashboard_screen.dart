@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/theme/app_tokens.dart';
+import '../../../whatsapp/presentation/providers/whatsapp_provider.dart';
 
 class AdminDashboardScreen extends ConsumerWidget {
   const AdminDashboardScreen({super.key});
@@ -11,11 +12,14 @@ class AdminDashboardScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isWideScreen = MediaQuery.of(context).size.width >= 800;
+    final whatsAppState = ref.watch(whatsAppProvider);
 
     return Scaffold(
       body: RefreshIndicator(
         onRefresh: () async {
           HapticFeedback.mediumImpact();
+          // Refresh health check
+          ref.read(whatsAppProvider.notifier).checkServerHealth();
         },
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(AppSpacing.md),
@@ -24,7 +28,7 @@ class AdminDashboardScreen extends ConsumerWidget {
             children: [
               _buildHeader(context),
               const SizedBox(height: AppSpacing.lg),
-              _buildStatsGrid(context, isWideScreen),
+              _buildStatsGrid(context, isWideScreen, whatsAppState),
               const SizedBox(height: AppSpacing.lg),
               if (isWideScreen)
                 Row(
@@ -43,7 +47,7 @@ class AdminDashboardScreen extends ConsumerWidget {
               const SizedBox(height: AppSpacing.lg),
               _buildRecentActivity(context),
               const SizedBox(height: AppSpacing.lg),
-              _buildSystemHealth(context),
+              _buildSystemHealth(context, whatsAppState),
             ],
           ),
         ),
@@ -97,16 +101,23 @@ class AdminDashboardScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildStatsGrid(BuildContext context, bool isWideScreen) {
+  Widget _buildStatsGrid(BuildContext context, bool isWideScreen, WhatsAppState whatsAppState) {
+    final isOpenWAHealthy = whatsAppState.serverHealthy ?? false;
     final stats = [
       const _StatData(icon: Icons.people, label: 'Total Users', value: '0', color: AppColors.primary, trend: '+0'),
       const _StatData(icon: Icons.people_alt, label: 'Active Users', value: '0', color: AppColors.success, trend: '+0'),
-      const _StatData(icon: Icons.phone_android, label: 'WhatsApp Sessions', value: '0', color: AppColors.info, trend: '+0'),
+      _StatData(icon: Icons.phone_android, label: 'WhatsApp Sessions', value: '${whatsAppState.sessions.length}', color: AppColors.info, trend: ''),
       const _StatData(icon: Icons.subscriptions, label: 'Active Subscriptions', value: '0', color: AppColors.warning, trend: '+0'),
       const _StatData(icon: Icons.calendar_view_month, label: 'Monthly Subscribers', value: '0', color: AppColors.primary, trend: '+0'),
       const _StatData(icon: Icons.calendar_today, label: 'Yearly Subscribers', value: '0', color: AppColors.secondary, trend: '+0'),
       const _StatData(icon: Icons.attach_money, label: 'Revenue', value: '\$0', color: AppColors.success, trend: '+0'),
-      const _StatData(icon: Icons.health_and_safety, label: 'System Status', value: 'Healthy', color: AppColors.success, trend: ''),
+      _StatData(
+        icon: Icons.health_and_safety,
+        label: 'System Status',
+        value: isOpenWAHealthy ? 'Healthy' : 'Degraded',
+        color: isOpenWAHealthy ? AppColors.success : AppColors.warning,
+        trend: '',
+      ),
     ];
 
     if (isWideScreen) {
@@ -228,7 +239,9 @@ class AdminDashboardScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildSystemHealth(BuildContext context) {
+  Widget _buildSystemHealth(BuildContext context, WhatsAppState whatsAppState) {
+    final isOpenWAHealthy = whatsAppState.serverHealthy ?? null;
+    
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.xl)),
@@ -241,7 +254,11 @@ class AdminDashboardScreen extends ConsumerWidget {
             const Divider(),
             const _HealthItem(label: 'Backend API', status: 'Operational', color: AppColors.success),
             const _HealthItem(label: 'Database', status: 'Operational', color: AppColors.success),
-            const _HealthItem(label: 'OpenWA Service', status: 'Unknown', color: AppColors.warning),
+            _HealthItem(
+              label: 'OpenWA Service',
+              status: isOpenWAHealthy == null ? 'Checking...' : (isOpenWAHealthy ? 'Operational' : 'Unavailable'),
+              color: isOpenWAHealthy == null ? AppColors.textSecondary : (isOpenWAHealthy ? AppColors.success : AppColors.error),
+            ),
             const _HealthItem(label: 'Supabase', status: 'Operational', color: AppColors.success),
           ],
         ),
