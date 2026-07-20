@@ -2,7 +2,12 @@ import 'package:flutter/material.dart';
 import '../../theme/app_tokens.dart';
 
 class UserAvatar extends StatelessWidget {
-  const UserAvatar({required super.key, required this.name, this.imageUrl, this.size = 40});
+  const UserAvatar({
+    required super.key,
+    required this.name,
+    this.imageUrl,
+    this.size = 40,
+  });
 
   final String name;
   final String? imageUrl;
@@ -17,12 +22,22 @@ class UserAvatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (imageUrl != null && imageUrl!.isNotEmpty) {
-      return CircleAvatar(radius: size / 2, backgroundImage: NetworkImage(imageUrl!));
+      return CircleAvatar(
+        radius: size / 2,
+        backgroundImage: NetworkImage(imageUrl!),
+      );
     }
     return CircleAvatar(
       radius: size / 2,
       backgroundColor: AppColors.primary.withOpacity(0.1),
-      child: Text(_getInitials().toUpperCase(), style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: size / 2.5)),
+      child: Text(
+        _getInitials().toUpperCase(),
+        style: TextStyle(
+          color: AppColors.primary,
+          fontWeight: FontWeight.bold,
+          fontSize: size / 2.5,
+        ),
+      ),
     );
   }
 }

@@ -8,15 +8,21 @@ class ShimmerLoading extends StatefulWidget {
   State<ShimmerLoading> createState() => _ShimmerLoadingState();
 }
 
-class _ShimmerLoadingState extends State<ShimmerLoading> with SingleTickerProviderStateMixin {
+class _ShimmerLoadingState extends State<ShimmerLoading>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _animation;
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 1500))..repeat();
-    _animation = Tween<double>(begin: -2, end: 2).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOutSine));
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    )..repeat();
+    _animation = Tween<double>(begin: -2, end: 2).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOutSine),
+    );
   }
 
   @override
@@ -35,7 +41,12 @@ class _ShimmerLoadingState extends State<ShimmerLoading> with SingleTickerProvid
       builder: (context, child) {
         return ShaderMask(
           shaderCallback: (bounds) {
-            return LinearGradient(begin: Alignment.centerLeft, end: Alignment.centerRight, colors: [baseColor, highlightColor, baseColor], stops: [0.0, 0.5 + _animation.value * 0.25, 1.0]).createShader(bounds);
+            return LinearGradient(
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+              colors: [baseColor, highlightColor, baseColor],
+              stops: [0.0, 0.5 + _animation.value * 0.25, 1.0],
+            ).createShader(bounds);
           },
           child: widget.child,
         );
@@ -45,7 +56,12 @@ class _ShimmerLoadingState extends State<ShimmerLoading> with SingleTickerProvid
 }
 
 class ShimmerBox extends StatelessWidget {
-  const ShimmerBox({super.key, this.width, this.height = 20, this.borderRadius});
+  const ShimmerBox({
+    super.key,
+    this.width,
+    this.height = 20,
+    this.borderRadius,
+  });
   final double? width;
   final double height;
   final double? borderRadius;
@@ -53,7 +69,14 @@ class ShimmerBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ShimmerLoading(
-      child: Container(width: width, height: height, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(borderRadius ?? AppRadius.md))),
+      child: Container(
+        width: width,
+        height: height,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(borderRadius ?? AppRadius.md),
+        ),
+      ),
     );
   }
 }

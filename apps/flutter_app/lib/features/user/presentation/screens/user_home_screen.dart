@@ -14,7 +14,7 @@ class UserHomeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authProvider);
     final theme = Theme.of(context);
-    
+
     return Scaffold(
       body: RefreshIndicator(
         onRefresh: () async {
@@ -78,7 +78,7 @@ class UserHomeScreen extends ConsumerWidget {
                   // Subscription Badge
                   _SubscriptionBadge(),
                   const SizedBox(height: AppSpacing.lg),
-                  
+
                   // Quick Stats
                   Text(
                     'Overview',
@@ -89,7 +89,7 @@ class UserHomeScreen extends ConsumerWidget {
                   const SizedBox(height: AppSpacing.md),
                   const _StatsGrid(),
                   const SizedBox(height: AppSpacing.lg),
-                  
+
                   // Quick Actions
                   Text(
                     'Quick Actions',
@@ -127,7 +127,7 @@ class UserHomeScreen extends ConsumerWidget {
                     },
                   ),
                   const SizedBox(height: AppSpacing.lg),
-                  
+
                   // Recent Activity
                   Text(
                     'Recent Activity',
@@ -156,7 +156,7 @@ class _SubscriptionBadge extends StatelessWidget {
         vertical: AppSpacing.sm,
       ),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
+        gradient: const LinearGradient(
           colors: [AppColors.primary, AppColors.primaryDark],
         ),
         borderRadius: BorderRadius.circular(AppRadius.xl),
@@ -349,21 +349,21 @@ class _QuickActionCard extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      style: AppTypography.titleSmall?.copyWith(
+                      style: AppTypography.titleSmall.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       subtitle,
-                      style: AppTypography.bodySmall?.copyWith(
+                      style: AppTypography.bodySmall.copyWith(
                         color: AppColors.textSecondary,
                       ),
                     ),
                   ],
                 ),
               ),
-              Icon(
+              const Icon(
                 Icons.chevron_right,
                 color: AppColors.textTertiary,
               ),
@@ -385,7 +385,7 @@ class _ActivityList extends StatelessWidget {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppRadius.xl),
       ),
-      child: Column(
+      child: const Column(
         children: [
           _ActivityItem(
             icon: Icons.login,
@@ -394,7 +394,7 @@ class _ActivityList extends StatelessWidget {
             time: 'Just now',
             color: AppColors.success,
           ),
-          const Divider(height: 1),
+          Divider(height: 1),
           _ActivityItem(
             icon: Icons.sync,
             title: 'Contacts Synced',
@@ -402,7 +402,7 @@ class _ActivityList extends StatelessWidget {
             time: '2 hours ago',
             color: AppColors.info,
           ),
-          const Divider(height: 1),
+          Divider(height: 1),
           _ActivityItem(
             icon: Icons.campaign,
             title: 'Campaign Sent',
@@ -445,13 +445,13 @@ class _ActivityItem extends StatelessWidget {
       title: Text(title, style: AppTypography.bodyMedium),
       subtitle: Text(
         subtitle,
-        style: AppTypography.bodySmall?.copyWith(
+        style: AppTypography.bodySmall.copyWith(
           color: AppColors.textSecondary,
         ),
       ),
       trailing: Text(
         time,
-        style: AppTypography.labelSmall?.copyWith(
+        style: AppTypography.labelSmall.copyWith(
           color: AppColors.textTertiary,
         ),
       ),

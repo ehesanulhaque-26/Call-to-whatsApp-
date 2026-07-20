@@ -97,7 +97,7 @@ class UserProfileScreen extends ConsumerWidget {
                       vertical: 6,
                     ),
                     decoration: BoxDecoration(
-                      gradient: LinearGradient(
+                      gradient: const LinearGradient(
                         colors: [AppColors.primary, AppColors.primaryDark],
                       ),
                       borderRadius: BorderRadius.circular(AppRadius.full),
@@ -214,12 +214,12 @@ class UserProfileScreen extends ConsumerWidget {
               Text(
                 'Edit Profile',
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+                      fontWeight: FontWeight.bold,
+                    ),
               ),
               const SizedBox(height: AppSpacing.lg),
-              TextField(
-                decoration: const InputDecoration(
+              const TextField(
+                decoration: InputDecoration(
                   labelText: 'Name',
                   prefixIcon: Icon(Icons.person_outline),
                 ),
@@ -232,7 +232,9 @@ class UserProfileScreen extends ConsumerWidget {
                   child: const Text('Save Changes'),
                 ),
               ),
-              SizedBox(height: MediaQuery.of(context).padding.bottom + AppSpacing.md),
+              SizedBox(
+                height: MediaQuery.of(context).padding.bottom + AppSpacing.md,
+              ),
             ],
           ),
         ),
@@ -268,29 +270,29 @@ class UserProfileScreen extends ConsumerWidget {
               Text(
                 'Change Password',
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+                      fontWeight: FontWeight.bold,
+                    ),
               ),
               const SizedBox(height: AppSpacing.lg),
-              TextField(
+              const TextField(
                 obscureText: true,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Current Password',
                   prefixIcon: Icon(Icons.lock_outline),
                 ),
               ),
               const SizedBox(height: AppSpacing.md),
-              TextField(
+              const TextField(
                 obscureText: true,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'New Password',
                   prefixIcon: Icon(Icons.lock_outline),
                 ),
               ),
               const SizedBox(height: AppSpacing.md),
-              TextField(
+              const TextField(
                 obscureText: true,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Confirm Password',
                   prefixIcon: Icon(Icons.lock_outline),
                 ),
@@ -303,7 +305,9 @@ class UserProfileScreen extends ConsumerWidget {
                   child: const Text('Update Password'),
                 ),
               ),
-              SizedBox(height: MediaQuery.of(context).padding.bottom + AppSpacing.md),
+              SizedBox(
+                height: MediaQuery.of(context).padding.bottom + AppSpacing.md,
+              ),
             ],
           ),
         ),
@@ -334,8 +338,8 @@ class UserProfileScreen extends ConsumerWidget {
             Text(
               'Choose Theme',
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+                    fontWeight: FontWeight.bold,
+                  ),
             ),
             const SizedBox(height: AppSpacing.lg),
             ListTile(
@@ -424,11 +428,12 @@ class _ProfileMenuItem extends StatelessWidget {
         title: Text(title, style: AppTypography.titleSmall),
         subtitle: Text(
           subtitle,
-          style: AppTypography.bodySmall?.copyWith(
+          style: AppTypography.bodySmall.copyWith(
             color: AppColors.textSecondary,
           ),
         ),
-        trailing: const Icon(Icons.chevron_right, color: AppColors.textTertiary),
+        trailing:
+            const Icon(Icons.chevron_right, color: AppColors.textTertiary),
       ),
     );
   }

@@ -78,21 +78,21 @@ class WhatsAppConnection {
   }
 
   factory WhatsAppConnection.disconnected() => WhatsAppConnection(
-    state: WhatsAppConnectionState.disconnected,
-  );
+        state: WhatsAppConnectionState.disconnected,
+      );
 
   factory WhatsAppConnection.creating() => WhatsAppConnection(
-    state: WhatsAppConnectionState.creating,
-  );
+        state: WhatsAppConnectionState.creating,
+      );
 
   factory WhatsAppConnection.qrReady(String qrCode) => WhatsAppConnection(
-    state: WhatsAppConnectionState.qrReady,
-    qrCode: qrCode,
-  );
+        state: WhatsAppConnectionState.qrReady,
+        qrCode: qrCode,
+      );
 
   factory WhatsAppConnection.connecting() => WhatsAppConnection(
-    state: WhatsAppConnectionState.connecting,
-  );
+        state: WhatsAppConnectionState.connecting,
+      );
 
   factory WhatsAppConnection.connected({
     required String sessionId,
@@ -103,55 +103,57 @@ class WhatsAppConnection {
     String? status,
     bool isHealthy = true,
     DateTime? lastConnected,
-  }) => WhatsAppConnection(
-    sessionId: sessionId,
-    name: name,
-    phone: phone,
-    businessName: businessName,
-    profilePhoto: profilePhoto,
-    status: status ?? 'Connected',
-    state: WhatsAppConnectionState.connected,
-    isHealthy: isHealthy,
-    lastConnected: lastConnected,
-  );
+  }) =>
+      WhatsAppConnection(
+        sessionId: sessionId,
+        name: name,
+        phone: phone,
+        businessName: businessName,
+        profilePhoto: profilePhoto,
+        status: status ?? 'Connected',
+        state: WhatsAppConnectionState.connected,
+        isHealthy: isHealthy,
+        lastConnected: lastConnected,
+      );
 
   factory WhatsAppConnection.error(String message) => WhatsAppConnection(
-    state: WhatsAppConnectionState.error,
-    errorMessage: message,
-  );
+        state: WhatsAppConnectionState.error,
+        errorMessage: message,
+      );
 
   Map<String, dynamic> toJson() => {
-    'sessionId': sessionId,
-    'name': name,
-    'phone': phone,
-    'businessName': businessName,
-    'profilePhoto': profilePhoto,
-    'status': status,
-    'state': state?.name,
-    'qrCode': qrCode,
-    'lastConnected': lastConnected?.toIso8601String(),
-    'isHealthy': isHealthy,
-    'errorMessage': errorMessage,
-  };
+        'sessionId': sessionId,
+        'name': name,
+        'phone': phone,
+        'businessName': businessName,
+        'profilePhoto': profilePhoto,
+        'status': status,
+        'state': state?.name,
+        'qrCode': qrCode,
+        'lastConnected': lastConnected?.toIso8601String(),
+        'isHealthy': isHealthy,
+        'errorMessage': errorMessage,
+      };
 
-  factory WhatsAppConnection.fromJson(Map<String, dynamic> json) => WhatsAppConnection(
-    sessionId: json['sessionId'] as String?,
-    name: json['name'] as String?,
-    phone: json['phone'] as String?,
-    businessName: json['businessName'] as String?,
-    profilePhoto: json['profilePhoto'] as String?,
-    status: json['status'] as String?,
-    state: json['state'] != null 
-        ? WhatsAppConnectionState.values.firstWhere(
-            (e) => e.name == json['state'],
-            orElse: () => WhatsAppConnectionState.disconnected,
-          )
-        : null,
-    qrCode: json['qrCode'] as String?,
-    lastConnected: json['lastConnected'] != null 
-        ? DateTime.parse(json['lastConnected'] as String) 
-        : null,
-    isHealthy: json['isHealthy'] as bool?,
-    errorMessage: json['errorMessage'] as String?,
-  );
+  factory WhatsAppConnection.fromJson(Map<String, dynamic> json) =>
+      WhatsAppConnection(
+        sessionId: json['sessionId'] as String?,
+        name: json['name'] as String?,
+        phone: json['phone'] as String?,
+        businessName: json['businessName'] as String?,
+        profilePhoto: json['profilePhoto'] as String?,
+        status: json['status'] as String?,
+        state: json['state'] != null
+            ? WhatsAppConnectionState.values.firstWhere(
+                (e) => e.name == json['state'],
+                orElse: () => WhatsAppConnectionState.disconnected,
+              )
+            : null,
+        qrCode: json['qrCode'] as String?,
+        lastConnected: json['lastConnected'] != null
+            ? DateTime.parse(json['lastConnected'] as String)
+            : null,
+        isHealthy: json['isHealthy'] as bool?,
+        errorMessage: json['errorMessage'] as String?,
+      );
 }

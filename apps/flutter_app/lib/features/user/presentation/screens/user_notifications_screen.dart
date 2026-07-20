@@ -9,8 +9,6 @@ class UserNotificationsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Notifications'),
@@ -79,15 +77,15 @@ class UserNotificationsScreen extends ConsumerWidget {
             Text(
               'No notifications',
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+                    fontWeight: FontWeight.bold,
+                  ),
             ),
             const SizedBox(height: AppSpacing.sm),
             Text(
               'You\'re all caught up!',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: AppColors.textSecondary,
-              ),
+                    color: AppColors.textSecondary,
+                  ),
             ),
           ],
         ),
@@ -158,21 +156,21 @@ class _NotificationCard extends StatelessWidget {
                 children: [
                   Text(
                     notification['title'] ?? '',
-                    style: AppTypography.titleSmall?.copyWith(
+                    style: AppTypography.titleSmall.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     notification['body'] ?? '',
-                    style: AppTypography.bodySmall?.copyWith(
+                    style: AppTypography.bodySmall.copyWith(
                       color: AppColors.textSecondary,
                     ),
                   ),
                   const SizedBox(height: AppSpacing.sm),
                   Text(
                     notification['time'] ?? '',
-                    style: AppTypography.labelSmall?.copyWith(
+                    style: AppTypography.labelSmall.copyWith(
                       color: AppColors.textTertiary,
                     ),
                   ),

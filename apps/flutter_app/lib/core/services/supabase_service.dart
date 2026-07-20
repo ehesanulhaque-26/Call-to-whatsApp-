@@ -5,7 +5,7 @@ import '../constants/env.dart';
 /// Supabase service for authentication and data access
 class SupabaseService {
   SupabaseService._();
-  
+
   static final SupabaseService _instance = SupabaseService._();
   static SupabaseService get instance => _instance;
 
@@ -24,6 +24,7 @@ class SupabaseService {
 
     await Supabase.initialize(
       url: Env.supabaseUrl,
+      // ignore: deprecated_member_use
       anonKey: Env.supabaseAnonKey,
       debug: Env.isDebug,
     );
@@ -87,7 +88,8 @@ class SupabaseService {
     if (name != null) updates['name'] = name;
     if (phone != null) updates['phone'] = phone;
 
-    final response = await _client.auth.updateUser(UserAttributes(data: updates));
+    final response =
+        await _client.auth.updateUser(UserAttributes(data: updates));
     return response.user!;
   }
 

@@ -36,7 +36,8 @@ class WhatsAppState {
 
 /// WhatsApp notifier for state management
 class WhatsAppNotifier extends StateNotifier<WhatsAppState> {
-  WhatsAppNotifier(this._repository, this._secureStorage) : super(WhatsAppState()) {
+  WhatsAppNotifier(this._repository, this._secureStorage)
+      : super(WhatsAppState()) {
     _initialize();
   }
 
@@ -46,8 +47,6 @@ class WhatsAppNotifier extends StateNotifier<WhatsAppState> {
   Timer? _qrRefreshTimer;
 
   static const _pollInterval = Duration(seconds: 3);
-  
-  
 
   String? _currentSessionId;
 
@@ -113,7 +112,8 @@ class WhatsAppNotifier extends StateNotifier<WhatsAppState> {
   /// Start polling for connection status
   void _startPolling() {
     _stopPolling();
-    _pollingTimer = Timer.periodic(_pollInterval, (_) => _checkConnectionStatus());
+    _pollingTimer =
+        Timer.periodic(_pollInterval, (_) => _checkConnectionStatus());
   }
 
   /// Stop polling
@@ -163,7 +163,7 @@ class WhatsAppNotifier extends StateNotifier<WhatsAppState> {
             final qr = await _repository.getQRCode(_currentSessionId!);
             state = state.copyWith(
               isLoading: false,
-              connection: qr != null 
+              connection: qr != null
                   ? WhatsAppConnection.qrReady(qr)
                   : WhatsAppConnection.qrReady(''),
             );
@@ -305,14 +305,16 @@ class WhatsAppNotifier extends StateNotifier<WhatsAppState> {
 }
 
 /// Provider for WhatsApp state
-final whatsAppProvider = StateNotifierProvider<WhatsAppNotifier, WhatsAppState>((ref) {
+final whatsAppProvider =
+    StateNotifierProvider<WhatsAppNotifier, WhatsAppState>((ref) {
   final repository = ref.watch(whatsAppRepositoryProvider);
   final secureStorage = ref.watch(secureStorageProvider);
   return WhatsAppNotifier(repository, secureStorage);
 });
 
 /// Provider for connection state enum
-final whatsAppConnectionStateProvider = Provider<WhatsAppConnectionState>((ref) {
+final whatsAppConnectionStateProvider =
+    Provider<WhatsAppConnectionState>((ref) {
   final state = ref.watch(whatsAppProvider);
   return state.connection?.state ?? WhatsAppConnectionState.disconnected;
 });
@@ -325,7 +327,6 @@ final isWhatsAppConnectedProvider = Provider<bool>((ref) {
 
 /// Provider for sessions list
 final sessionsProvider = FutureProvider<List<OpenWASession>>((ref) async {
-  final repository = ref.watch(whatsAppRepositoryProvider);
   // Return empty list - actual implementation would fetch from backend
   return [];
 });

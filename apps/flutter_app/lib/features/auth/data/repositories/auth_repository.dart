@@ -75,24 +75,33 @@ class AuthRepositoryImpl implements AuthRepository {
       );
 
       final user = response.user;
-      developer.log('[AuthRepo] LOGIN: signIn completed, userId=${user?.id}', name: 'Auth');
+      developer.log(
+        '[AuthRepo] LOGIN: signIn completed, userId=${user?.id}',
+        name: 'Auth',
+      );
 
       if (user != null) {
         // Get profile in background (don't block login)
         String role = 'user';
         String? profileName;
-        
+
         try {
           final profile = await fetchProfile(user.id);
           if (profile != null) {
             role = profile.role;
             profileName = profile.name;
-            developer.log('[AuthRepo] LOGIN: Profile fetched, role=$role', name: 'Auth');
+            developer.log(
+              '[AuthRepo] LOGIN: Profile fetched, role=$role',
+              name: 'Auth',
+            );
           } else {
             developer.log('[AuthRepo] LOGIN: No profile found', name: 'Auth');
           }
         } catch (e) {
-          developer.log('[AuthRepo] LOGIN: Profile fetch error: $e', name: 'Auth');
+          developer.log(
+            '[AuthRepo] LOGIN: Profile fetch error: $e',
+            name: 'Auth',
+          );
         }
 
         return AuthResponse(
@@ -103,14 +112,20 @@ class AuthRepositoryImpl implements AuthRepository {
           role: role,
         );
       } else {
-        developer.log('[AuthRepo] LOGIN: Failed - no user returned', name: 'Auth');
+        developer.log(
+          '[AuthRepo] LOGIN: Failed - no user returned',
+          name: 'Auth',
+        );
         return AuthResponse(
           success: false,
           error: 'Login failed',
         );
       }
     } on AuthException catch (e) {
-      developer.log('[AuthRepo] LOGIN: AuthException: ${e.message}', name: 'Auth');
+      developer.log(
+        '[AuthRepo] LOGIN: AuthException: ${e.message}',
+        name: 'Auth',
+      );
       return AuthResponse(
         success: false,
         error: e.message,
@@ -141,7 +156,10 @@ class AuthRepositoryImpl implements AuthRepository {
 
       final user = response.user;
       if (user != null) {
-        developer.log('[AuthRepo] REGISTER: Success, userId=${user.id}', name: 'Auth');
+        developer.log(
+          '[AuthRepo] REGISTER: Success, userId=${user.id}',
+          name: 'Auth',
+        );
         return AuthResponse(
           success: true,
           userId: user.id,
@@ -150,14 +168,20 @@ class AuthRepositoryImpl implements AuthRepository {
           role: 'user',
         );
       } else {
-        developer.log('[AuthRepo] REGISTER: Failed - no user returned', name: 'Auth');
+        developer.log(
+          '[AuthRepo] REGISTER: Failed - no user returned',
+          name: 'Auth',
+        );
         return AuthResponse(
           success: false,
           error: 'Registration failed',
         );
       }
     } on AuthException catch (e) {
-      developer.log('[AuthRepo] REGISTER: AuthException: ${e.message}', name: 'Auth');
+      developer.log(
+        '[AuthRepo] REGISTER: AuthException: ${e.message}',
+        name: 'Auth',
+      );
       return AuthResponse(
         success: false,
         error: e.message,
@@ -174,11 +198,17 @@ class AuthRepositoryImpl implements AuthRepository {
   @override
   Future<bool> forgotPassword({required String email}) async {
     try {
-      developer.log('[AuthRepo] FORGOT_PASSWORD: Sending to $email', name: 'Auth');
+      developer.log(
+        '[AuthRepo] FORGOT_PASSWORD: Sending to $email',
+        name: 'Auth',
+      );
       await _supabaseService.resetPassword(email);
       return true;
     } on AuthException catch (e) {
-      developer.log('[AuthRepo] FORGOT_PASSWORD: AuthException: ${e.message}', name: 'Auth');
+      developer.log(
+        '[AuthRepo] FORGOT_PASSWORD: AuthException: ${e.message}',
+        name: 'Auth',
+      );
       throw Exception(e.message);
     } catch (e) {
       developer.log('[AuthRepo] FORGOT_PASSWORD: Exception: $e', name: 'Auth');
@@ -207,16 +237,25 @@ class AuthRepositoryImpl implements AuthRepository {
         return null;
       }
 
-      developer.log('[AuthRepo] GET_CURRENT_USER: userId=${user.id}', name: 'Auth');
+      developer.log(
+        '[AuthRepo] GET_CURRENT_USER: userId=${user.id}',
+        name: 'Auth',
+      );
 
       final profile = await fetchProfile(user.id);
       if (profile != null) {
-        developer.log('[AuthRepo] GET_CURRENT_USER: Profile found, role=${profile.role}', name: 'Auth');
+        developer.log(
+          '[AuthRepo] GET_CURRENT_USER: Profile found, role=${profile.role}',
+          name: 'Auth',
+        );
         return profile;
       }
 
       // Return default profile if no row found
-      developer.log('[AuthRepo] GET_CURRENT_USER: No profile, returning default', name: 'Auth');
+      developer.log(
+        '[AuthRepo] GET_CURRENT_USER: No profile, returning default',
+        name: 'Auth',
+      );
       return UserProfile(
         id: user.id,
         email: user.email ?? '',
@@ -241,7 +280,10 @@ class AuthRepositoryImpl implements AuthRepository {
   @override
   Future<UserProfile?> fetchProfile(String userId) async {
     try {
-      developer.log('[AuthRepo] FETCH_PROFILE: Querying for userId=$userId', name: 'Auth');
+      developer.log(
+        '[AuthRepo] FETCH_PROFILE: Querying for userId=$userId',
+        name: 'Auth',
+      );
 
       final response = await _supabaseService.client
           .from('profiles')
@@ -250,11 +292,17 @@ class AuthRepositoryImpl implements AuthRepository {
           .maybeSingle();
 
       if (response == null) {
-        developer.log('[AuthRepo] FETCH_PROFILE: No row found for userId=$userId', name: 'Auth');
+        developer.log(
+          '[AuthRepo] FETCH_PROFILE: No row found for userId=$userId',
+          name: 'Auth',
+        );
         return null;
       }
 
-      developer.log('[AuthRepo] FETCH_PROFILE: Row found: $response', name: 'Auth');
+      developer.log(
+        '[AuthRepo] FETCH_PROFILE: Row found: $response',
+        name: 'Auth',
+      );
 
       return UserProfile(
         id: response['id'] as String,

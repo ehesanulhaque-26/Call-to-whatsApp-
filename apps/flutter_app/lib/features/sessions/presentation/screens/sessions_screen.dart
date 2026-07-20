@@ -12,11 +12,15 @@ class SessionsScreen extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.phone_android, size: 64, color: Theme.of(context).colorScheme.primary),
+            Icon(
+              Icons.phone_android,
+              size: 64,
+              color: Theme.of(context).colorScheme.primary,
+            ),
             const SizedBox(height: AppSpacing.md),
             Text('No Sessions', style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: AppSpacing.sm),
-            Text('Connect your WhatsApp to get started'),
+            const Text('Connect your WhatsApp to get started'),
           ],
         ),
       ),

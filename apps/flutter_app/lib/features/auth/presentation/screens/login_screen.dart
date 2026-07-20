@@ -44,7 +44,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
 
     final authState = ref.read(authProvider);
-    developer.log('[Login] Result=$result, isAuth=${authState.isAuthenticated}, role=${authState.role}', name: 'Auth');
+    developer.log(
+      '[Login] Result=$result, isAuth=${authState.isAuthenticated}, role=${authState.role}',
+      name: 'Auth',
+    );
 
     if (result && authState.isAuthenticated) {
       final isAdmin = authState.role == 'admin';
@@ -206,8 +209,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       ),
                     ),
                     TextButton(
-                      onPressed:
-                          isLoading ? null : () => context.push(AppRoutes.register),
+                      onPressed: isLoading
+                          ? null
+                          : () => context.push(AppRoutes.register),
                       child: const Text('Sign Up'),
                     ),
                   ],

@@ -230,7 +230,8 @@ class HomeScreen extends ConsumerWidget {
               builder: (context, ref, _) {
                 final whatsAppState = ref.watch(whatsAppProvider);
                 final connection = whatsAppState.connection;
-                final isConnected = connection?.state == WhatsAppConnectionState.connected;
+                final isConnected =
+                    connection?.state == WhatsAppConnectionState.connected;
                 final isLoading = whatsAppState.isLoading;
 
                 return Column(
@@ -245,7 +246,7 @@ class HomeScreen extends ConsumerWidget {
                     const SizedBox(height: AppSpacing.md),
                     Card(
                       child: InkWell(
-                        onTap: () => context.go(AppRoutes.whatsApp),
+                        onTap: () => context.go(AppRoutes.sessions),
                         borderRadius: BorderRadius.circular(AppRadius.xl),
                         child: Padding(
                           padding: const EdgeInsets.all(AppSpacing.md),
@@ -258,11 +259,16 @@ class HomeScreen extends ConsumerWidget {
                                   color: isConnected
                                       ? AppColors.success.withOpacity(0.1)
                                       : AppColors.textTertiary.withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(AppRadius.md),
+                                  borderRadius:
+                                      BorderRadius.circular(AppRadius.md),
                                 ),
                                 child: Icon(
-                                  isConnected ? Icons.check_circle : Icons.qr_code,
-                                  color: isConnected ? AppColors.success : AppColors.textTertiary,
+                                  isConnected
+                                      ? Icons.check_circle
+                                      : Icons.qr_code,
+                                  color: isConnected
+                                      ? AppColors.success
+                                      : AppColors.textTertiary,
                                 ),
                               ),
                               const SizedBox(width: AppSpacing.md),
@@ -272,7 +278,8 @@ class HomeScreen extends ConsumerWidget {
                                   children: [
                                     Text(
                                       isConnected
-                                          ? connection?.name ?? 'WhatsApp Connected'
+                                          ? connection?.name ??
+                                              'WhatsApp Connected'
                                           : 'Not Connected',
                                       style: AppTypography.titleSmall.copyWith(
                                         fontWeight: FontWeight.bold,
@@ -297,7 +304,8 @@ class HomeScreen extends ConsumerWidget {
                                   ),
                                   decoration: BoxDecoration(
                                     color: AppColors.success.withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(AppRadius.full),
+                                    borderRadius:
+                                        BorderRadius.circular(AppRadius.full),
                                   ),
                                   child: Row(
                                     mainAxisSize: MainAxisSize.min,
@@ -313,7 +321,8 @@ class HomeScreen extends ConsumerWidget {
                                       const SizedBox(width: AppSpacing.xs),
                                       Text(
                                         'Connected',
-                                        style: AppTypography.labelSmall.copyWith(
+                                        style:
+                                            AppTypography.labelSmall.copyWith(
                                           color: AppColors.success,
                                         ),
                                       ),
@@ -324,18 +333,23 @@ class HomeScreen extends ConsumerWidget {
                                 ElevatedButton(
                                   onPressed: isLoading
                                       ? null
-                                      : () => context.go(AppRoutes.whatsApp),
+                                      : () => context.go(AppRoutes.sessions),
                                   style: ElevatedButton.styleFrom(
                                     padding: const EdgeInsets.symmetric(
                                       horizontal: AppSpacing.md,
                                       vertical: AppSpacing.xs,
                                     ),
                                   ),
-                                  child: Text(isLoading ? 'Loading...' : 'Connect'),
+                                  child: Text(
+                                    isLoading ? 'Loading...' : 'Connect',
+                                  ),
                                 ),
                               ],
                               const SizedBox(width: AppSpacing.sm),
-                              const Icon(Icons.chevron_right, color: AppColors.textTertiary),
+                              const Icon(
+                                Icons.chevron_right,
+                                color: AppColors.textTertiary,
+                              ),
                             ],
                           ),
                         ),
@@ -397,7 +411,9 @@ class HomeScreen extends ConsumerWidget {
                         borderRadius: BorderRadius.circular(AppRadius.md),
                       ),
                       child: Icon(
-                        isHealthy ? Icons.cloud_done_outlined : Icons.cloud_off_outlined,
+                        isHealthy
+                            ? Icons.cloud_done_outlined
+                            : Icons.cloud_off_outlined,
                         color: isHealthy ? AppColors.success : AppColors.error,
                       ),
                     ),
@@ -433,17 +449,17 @@ class HomeScreen extends ConsumerWidget {
               icon: Icons.chat_bubble,
               title: 'WhatsApp Connection',
               description: 'Manage your WhatsApp connection',
-              onTap: () => context.go(AppRoutes.whatsApp),
+              onTap: () => context.go(AppRoutes.sessions),
             ),
             const SizedBox(height: AppSpacing.sm),
-            _FeatureCard(
+            const _FeatureCard(
               icon: Icons.auto_awesome,
               title: 'Automations',
               description: 'Create automated message workflows',
               isComing: true,
             ),
             const SizedBox(height: AppSpacing.sm),
-            _FeatureCard(
+            const _FeatureCard(
               icon: Icons.campaign,
               title: 'Campaigns',
               description: 'Send bulk messages to contacts',

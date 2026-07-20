@@ -12,25 +12,29 @@ class ApiClient {
 
   /// Initialize the API client
   void init() {
-    _dio = Dio(BaseOptions(
-      baseUrl: Env.apiBaseUrl,
-      connectTimeout: const Duration(seconds: 30),
-      receiveTimeout: const Duration(seconds: 30),
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
-    ),);
+    _dio = Dio(
+      BaseOptions(
+        baseUrl: Env.apiBaseUrl,
+        connectTimeout: const Duration(seconds: 30),
+        receiveTimeout: const Duration(seconds: 30),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+      ),
+    );
 
-    _dio.interceptors.add(InterceptorsWrapper(
-      onRequest: (options, handler) async {
-        final token = _supabaseService.accessToken;
-        if (token != null) {
-          options.headers['Authorization'] = 'Bearer $token';
-        }
-        return handler.next(options);
-      },
-    ),);
+    _dio.interceptors.add(
+      InterceptorsWrapper(
+        onRequest: (options, handler) async {
+          final token = _supabaseService.accessToken;
+          if (token != null) {
+            options.headers['Authorization'] = 'Bearer $token';
+          }
+          return handler.next(options);
+        },
+      ),
+    );
   }
 
   /// Get Dio instance for custom operations
@@ -142,9 +146,7 @@ class ApiResponse<T> {
           ? fromJsonT(json['data'])
           : json['data'],
       message: json['message'],
-      errors: json['errors'] != null
-          ? List<String>.from(json['errors'])
-          : null,
+      errors: json['errors'] != null ? List<String>.from(json['errors']) : null,
     );
   }
 }

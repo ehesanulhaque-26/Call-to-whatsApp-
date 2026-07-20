@@ -12,11 +12,18 @@ class AutomationsScreen extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.auto_awesome, size: 64, color: Theme.of(context).colorScheme.primary),
+            Icon(
+              Icons.auto_awesome,
+              size: 64,
+              color: Theme.of(context).colorScheme.primary,
+            ),
             const SizedBox(height: AppSpacing.md),
-            Text('No Automations', style: Theme.of(context).textTheme.titleLarge),
+            Text(
+              'No Automations',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
             const SizedBox(height: AppSpacing.sm),
-            Text('Create your first automation'),
+            const Text('Create your first automation'),
           ],
         ),
       ),

@@ -17,11 +17,11 @@ class OpenWASession {
   });
 
   factory OpenWASession.fromJson(Map<String, dynamic> json) => OpenWASession(
-    id: json['id'] as String? ?? '',
-    name: json['name'] as String?,
-    status: json['status'] as String?,
-    createdAt: json['created_at'] as String?,
-  );
+        id: json['id'] as String? ?? '',
+        name: json['name'] as String?,
+        status: json['status'] as String?,
+        createdAt: json['created_at'] as String?,
+      );
 }
 
 class OpenWASessionStatus {
@@ -35,11 +35,12 @@ class OpenWASessionStatus {
     this.qrCode,
   });
 
-  factory OpenWASessionStatus.fromJson(Map<String, dynamic> json) => OpenWASessionStatus(
-    state: json['state'] as String? ?? 'disconnected',
-    qr: json['qr'] as String?,
-    qrCode: json['qr_code'] as String?,
-  );
+  factory OpenWASessionStatus.fromJson(Map<String, dynamic> json) =>
+      OpenWASessionStatus(
+        state: json['state'] as String? ?? 'disconnected',
+        qr: json['qr'] as String?,
+        qrCode: json['qr_code'] as String?,
+      );
 }
 
 /// WhatsApp repository for API calls
@@ -68,16 +69,19 @@ class WhatsAppRepository {
 
   /// Get session status
   Future<OpenWASessionStatus> getSessionStatus(String sessionId) async {
-    final response = await _apiClient.get('/api/v1/openwa/sessions/$sessionId/status');
+    final response =
+        await _apiClient.get('/api/v1/openwa/sessions/$sessionId/status');
     return OpenWASessionStatus.fromJson(response.data);
   }
 
   /// Get QR code for session
   Future<String?> getQRCode(String sessionId) async {
     try {
-      final response = await _apiClient.get('/api/v1/openwa/sessions/$sessionId/qr');
+      final response =
+          await _apiClient.get('/api/v1/openwa/sessions/$sessionId/qr');
       if (response.statusCode == 200 && response.data != null) {
-        final data = response.data is String ? jsonDecode(response.data) : response.data;
+        final data =
+            response.data is String ? jsonDecode(response.data) : response.data;
         return data['qr'] as String?;
       }
     } catch (_) {}
@@ -87,7 +91,8 @@ class WhatsAppRepository {
   /// Reconnect session
   Future<bool> reconnectSession(String sessionId) async {
     try {
-      final response = await _apiClient.post('/api/v1/openwa/sessions/$sessionId/reconnect');
+      final response =
+          await _apiClient.post('/api/v1/openwa/sessions/$sessionId/reconnect');
       return response.statusCode == 200;
     } catch (_) {
       return false;
@@ -97,7 +102,8 @@ class WhatsAppRepository {
   /// Logout session
   Future<bool> logoutSession(String sessionId) async {
     try {
-      final response = await _apiClient.post('/api/v1/openwa/sessions/$sessionId/logout');
+      final response =
+          await _apiClient.post('/api/v1/openwa/sessions/$sessionId/logout');
       return response.statusCode == 200;
     } catch (_) {
       return false;
@@ -107,7 +113,8 @@ class WhatsAppRepository {
   /// Delete session
   Future<bool> deleteSession(String sessionId) async {
     try {
-      final response = await _apiClient.delete('/api/v1/openwa/sessions/$sessionId');
+      final response =
+          await _apiClient.delete('/api/v1/openwa/sessions/$sessionId');
       return response.statusCode == 200 || response.statusCode == 204;
     } catch (_) {
       return false;
@@ -117,7 +124,8 @@ class WhatsAppRepository {
   /// Get session info
   Future<OpenWASession?> getSession(String sessionId) async {
     try {
-      final response = await _apiClient.get('/api/v1/openwa/sessions/$sessionId');
+      final response =
+          await _apiClient.get('/api/v1/openwa/sessions/$sessionId');
       if (response.statusCode == 200) {
         return OpenWASession.fromJson(response.data);
       }

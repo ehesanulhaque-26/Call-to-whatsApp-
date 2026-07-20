@@ -24,7 +24,8 @@ class Env {
   );
 
   /// Whether the app is running in debug mode
-  static const bool isDebug = bool.fromEnvironment('DEBUG', defaultValue: false);
+  static const bool isDebug =
+      bool.fromEnvironment('DEBUG', defaultValue: false);
 
   /// App version
   static const String appVersion = String.fromEnvironment(

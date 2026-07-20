@@ -82,7 +82,9 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                     borderRadius: BorderRadius.circular(AppRadius.xxl),
                   ),
                   child: Icon(
-                    _emailSent ? Icons.check_circle_outline : Icons.lock_outline,
+                    _emailSent
+                        ? Icons.check_circle_outline
+                        : Icons.lock_outline,
                     size: 56,
                     color: AppColors.primary,
                   ),
@@ -177,7 +179,8 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                 const SizedBox(height: AppSpacing.xxl),
                 // Back to login
                 TextButton(
-                  onPressed: isLoading ? null : () => context.go(AppRoutes.login),
+                  onPressed:
+                      isLoading ? null : () => context.go(AppRoutes.login),
                   child: const Text('Back to Sign In'),
                 ),
               ],

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_tokens.dart';
 
 /// User subscription screen with mobile-first design
@@ -139,32 +138,32 @@ class UserSubscriptionScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: AppSpacing.md),
-            _FeatureItem(
+            const _FeatureItem(
               icon: Icons.phone_android,
               title: 'WhatsApp Sessions',
               value: 'Unlimited',
             ),
-            _FeatureItem(
+            const _FeatureItem(
               icon: Icons.contacts,
               title: 'Contacts',
               value: 'Unlimited',
             ),
-            _FeatureItem(
+            const _FeatureItem(
               icon: Icons.campaign,
               title: 'Campaign Messages',
               value: 'Unlimited',
             ),
-            _FeatureItem(
+            const _FeatureItem(
               icon: Icons.auto_awesome,
               title: 'Automations',
               value: 'Unlimited',
             ),
-            _FeatureItem(
+            const _FeatureItem(
               icon: Icons.cloud,
               title: 'Cloud Storage',
               value: '10 GB',
             ),
-            _FeatureItem(
+            const _FeatureItem(
               icon: Icons.support,
               title: 'Priority Support',
               value: '24/7',
@@ -235,17 +234,17 @@ class UserSubscriptionScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: AppSpacing.md),
-            _BillingItem(
+            const _BillingItem(
               date: 'July 15, 2026',
               amount: '\$19.99',
               status: 'Paid',
             ),
-            _BillingItem(
+            const _BillingItem(
               date: 'June 15, 2026',
               amount: '\$19.99',
               status: 'Paid',
             ),
-            _BillingItem(
+            const _BillingItem(
               date: 'May 15, 2026',
               amount: '\$19.99',
               status: 'Paid',
@@ -289,7 +288,7 @@ class _FeatureItem extends StatelessWidget {
           ),
           Text(
             value,
-            style: AppTypography.bodyMedium?.copyWith(
+            style: AppTypography.bodyMedium.copyWith(
               fontWeight: FontWeight.bold,
               color: AppColors.primary,
             ),
@@ -339,7 +338,7 @@ class _PlanCard extends StatelessWidget {
                   Expanded(
                     child: Text(
                       title,
-                      style: AppTypography.titleMedium?.copyWith(
+                      style: AppTypography.titleMedium.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -371,7 +370,7 @@ class _PlanCard extends StatelessWidget {
                 children: [
                   Text(
                     price,
-                    style: AppTypography.headlineMedium?.copyWith(
+                    style: AppTypography.headlineMedium.copyWith(
                       fontWeight: FontWeight.bold,
                       color: AppColors.primary,
                     ),
@@ -381,7 +380,7 @@ class _PlanCard extends StatelessWidget {
                     padding: const EdgeInsets.only(bottom: 4),
                     child: Text(
                       period,
-                      style: AppTypography.bodySmall?.copyWith(
+                      style: AppTypography.bodySmall.copyWith(
                         color: AppColors.textSecondary,
                       ),
                     ),
@@ -389,27 +388,29 @@ class _PlanCard extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: AppSpacing.md),
-              ...features.map((f) => Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.check,
-                      size: 16,
-                      color: AppColors.success,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(f, style: AppTypography.bodySmall),
-                  ],
+              ...features.map(
+                (f) => Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.check,
+                        size: 16,
+                        color: AppColors.success,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(f, style: AppTypography.bodySmall),
+                    ],
+                  ),
                 ),
-              )),
+              ),
               const SizedBox(height: AppSpacing.md),
               SizedBox(
                 width: double.infinity,
                 child: isSelected
-                    ? OutlinedButton(
+                    ? const OutlinedButton(
                         onPressed: null,
-                        child: const Text('Current Plan'),
+                        child: Text('Current Plan'),
                       )
                     : FilledButton(
                         onPressed: onTap,
@@ -459,13 +460,13 @@ class _BillingItem extends StatelessWidget {
         title: Text(date, style: AppTypography.bodyMedium),
         subtitle: Text(
           status,
-          style: AppTypography.bodySmall?.copyWith(
+          style: AppTypography.bodySmall.copyWith(
             color: AppColors.success,
           ),
         ),
         trailing: Text(
           amount,
-          style: AppTypography.titleSmall?.copyWith(
+          style: AppTypography.titleSmall.copyWith(
             fontWeight: FontWeight.bold,
           ),
         ),

@@ -6,7 +6,8 @@ import '../../data/repositories/auth_repository.dart';
 
 /// Auth notifier for managing authentication state using Supabase Auth
 class AuthNotifier extends StateNotifier<AuthState> {
-  AuthNotifier(this._repository, this._supabaseService) : super(const AuthState());
+  AuthNotifier(this._repository, this._supabaseService)
+      : super(const AuthState());
 
   final AuthRepository _repository;
   final SupabaseService _supabaseService;
@@ -17,7 +18,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
     final user = _supabaseService.currentUser;
     if (user == null) {
-      developer.log('[AuthNotifier] CHECK_AUTH: No user, clearing state', name: 'Auth');
+      developer.log(
+        '[AuthNotifier] CHECK_AUTH: No user, clearing state',
+        name: 'Auth',
+      );
       state = const AuthState();
       return;
     }
@@ -25,7 +29,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     developer.log('[AuthNotifier] CHECK_AUTH: User=${user.id}', name: 'Auth');
 
     final profile = await _repository.getCurrentUser();
-    
+
     if (profile != null) {
       state = AuthState(
         isAuthenticated: true,
@@ -44,8 +48,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
         role: 'user',
       );
     }
-    
-    developer.log('[AuthNotifier] CHECK_AUTH: Done, isAuth=${state.isAuthenticated}, role=${state.role}', name: 'Auth');
+
+    developer.log(
+      '[AuthNotifier] CHECK_AUTH: Done, isAuth=${state.isAuthenticated}, role=${state.role}',
+      name: 'Auth',
+    );
   }
 
   /// Login with email and password
@@ -62,7 +69,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
         password: password,
       );
 
-      developer.log('[AuthNotifier] LOGIN: Response success=${response.success}, userId=${response.userId}', name: 'Auth');
+      developer.log(
+        '[AuthNotifier] LOGIN: Response success=${response.success}, userId=${response.userId}',
+        name: 'Auth',
+      );
 
       if (response.success && response.userId != null) {
         state = AuthState(
@@ -72,7 +82,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
           name: response.name ?? '',
           role: response.role ?? 'user',
         );
-        developer.log('[AuthNotifier] LOGIN: Success, role=${state.role}', name: 'Auth');
+        developer.log(
+          '[AuthNotifier] LOGIN: Success, role=${state.role}',
+          name: 'Auth',
+        );
         return true;
       } else {
         state = state.copyWith(
@@ -82,7 +95,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
         return false;
       }
     } catch (e, stack) {
-      developer.log('[AuthNotifier] LOGIN: Exception: $e\n$stack', name: 'Auth');
+      developer.log(
+        '[AuthNotifier] LOGIN: Exception: $e\n$stack',
+        name: 'Auth',
+      );
       state = state.copyWith(
         isLoading: false,
         error: e.toString(),

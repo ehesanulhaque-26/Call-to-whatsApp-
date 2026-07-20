@@ -7,7 +7,7 @@ class UsersScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Users')),
-      body: Center(child: Text('No users yet')),
+      body: const Center(child: Text('No users yet')),
     );
   }
 }

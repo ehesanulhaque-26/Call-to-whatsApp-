@@ -2,13 +2,10 @@ import 'dart:developer' as developer;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../features/auth/presentation/providers/auth_provider.dart';
 import '../../features/auth/presentation/screens/splash_screen.dart';
 import '../../features/auth/presentation/screens/login_screen.dart';
 import '../../features/auth/presentation/screens/register_screen.dart';
 import '../../features/auth/presentation/screens/forgot_password_screen.dart';
-import '../../features/home/presentation/screens/home_screen.dart';
-import '../../features/whatsapp/presentation/screens/whatsapp_screen.dart';
 import '../../features/automations/presentation/screens/automations_screen.dart';
 import '../../features/settings/presentation/screens/settings_screen.dart';
 import '../../features/admin/presentation/screens/admin_dashboard_screen.dart';
@@ -31,14 +28,11 @@ class AppRoutes {
   static const String register = '/register';
   static const String forgotPassword = '/forgot-password';
   static const String home = '/home';
-  static const String whatsApp = '/whatsapp';
   static const String automations = '/automations';
   static const String settings = '/settings';
   static const String admin = '/admin';
   static const String adminUsers = '/admin/users';
   static const String adminSubscriptions = '/admin/subscriptions';
-  
-  // User routes
   static const String sessions = '/sessions';
   static const String contacts = '/contacts';
   static const String notifications = '/notifications';
@@ -62,27 +56,29 @@ final routerProvider = Provider<GoRouter>((ref) {
           state.matchedLocation == AppRoutes.forgotPassword ||
           state.matchedLocation == AppRoutes.splash;
 
-      // Skip redirect on splash screen
       if (state.matchedLocation == AppRoutes.splash) {
         return null;
       }
 
-      // Redirect unauthenticated users to login
       if (!isLoggedIn && !isAuthRoute) {
-        developer.log('[Router] Redirect to login - not authenticated', name: 'Router');
+        developer.log(
+          '[Router] Redirect to login - not authenticated',
+          name: 'Router',
+        );
         return AppRoutes.login;
       }
 
-      // Redirect authenticated users away from auth routes
       if (isLoggedIn && isAuthRoute) {
-        developer.log('[Router] Redirect to home - already authenticated', name: 'Router');
+        developer.log(
+          '[Router] Redirect to home - already authenticated',
+          name: 'Router',
+        );
         return AppRoutes.home;
       }
 
       return null;
     },
     routes: [
-      // Auth routes
       GoRoute(
         path: AppRoutes.splash,
         name: 'splash',
@@ -121,88 +117,84 @@ final routerProvider = Provider<GoRouter>((ref) {
           },
         ),
       ),
-      
-      // User shell routes with bottom navigation
       ShellRoute(
         navigatorKey: _shellNavigatorKey,
         builder: (context, state, child) => UserShell(child: child),
         routes: [
-          // User home/dashboard
           GoRoute(
             path: AppRoutes.home,
             name: 'home',
             pageBuilder: (context, state) => CustomTransitionPage(
               key: state.pageKey,
               child: const UserHomeScreen(),
-              transitionsBuilder: (context, animation, secondaryAnimation, child) {
+              transitionsBuilder:
+                  (context, animation, secondaryAnimation, child) {
                 return FadeTransition(opacity: animation, child: child);
               },
             ),
           ),
-          // User sessions
           GoRoute(
             path: AppRoutes.sessions,
             name: 'sessions',
             pageBuilder: (context, state) => CustomTransitionPage(
               key: state.pageKey,
               child: const UserSessionsScreen(),
-              transitionsBuilder: (context, animation, secondaryAnimation, child) {
+              transitionsBuilder:
+                  (context, animation, secondaryAnimation, child) {
                 return FadeTransition(opacity: animation, child: child);
               },
             ),
           ),
-          // User contacts
           GoRoute(
             path: AppRoutes.contacts,
             name: 'contacts',
             pageBuilder: (context, state) => CustomTransitionPage(
               key: state.pageKey,
               child: const UserContactsScreen(),
-              transitionsBuilder: (context, animation, secondaryAnimation, child) {
+              transitionsBuilder:
+                  (context, animation, secondaryAnimation, child) {
                 return FadeTransition(opacity: animation, child: child);
               },
             ),
           ),
-          // User notifications
           GoRoute(
             path: AppRoutes.notifications,
             name: 'notifications',
             pageBuilder: (context, state) => CustomTransitionPage(
               key: state.pageKey,
               child: const UserNotificationsScreen(),
-              transitionsBuilder: (context, animation, secondaryAnimation, child) {
+              transitionsBuilder:
+                  (context, animation, secondaryAnimation, child) {
                 return FadeTransition(opacity: animation, child: child);
               },
             ),
           ),
-          // User profile
           GoRoute(
             path: AppRoutes.profile,
             name: 'profile',
             pageBuilder: (context, state) => CustomTransitionPage(
               key: state.pageKey,
               child: const UserProfileScreen(),
-              transitionsBuilder: (context, animation, secondaryAnimation, child) {
+              transitionsBuilder:
+                  (context, animation, secondaryAnimation, child) {
                 return FadeTransition(opacity: animation, child: child);
               },
             ),
           ),
-          // User subscription
           GoRoute(
             path: AppRoutes.subscription,
             name: 'subscription',
             pageBuilder: (context, state) => CustomTransitionPage(
               key: state.pageKey,
               child: const UserSubscriptionScreen(),
-              transitionsBuilder: (context, animation, secondaryAnimation, child) {
+              transitionsBuilder:
+                  (context, animation, secondaryAnimation, child) {
                 return FadeTransition(opacity: animation, child: child);
               },
             ),
           ),
         ],
       ),
-      
-      // Admin routes (outside user shell)
       GoRoute(
         path: AppRoutes.admin,
         name: 'admin',
@@ -217,19 +209,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.adminSubscriptions,
         name: 'adminSubscriptions',
         builder: (context, state) => const SubscriptionsScreen(),
-      ),
-      
-      // Legacy routes (for backward compatibility)
-      GoRoute(
-        path: AppRoutes.whatsApp,
-        name: 'whatsApp',
-        pageBuilder: (context, state) => CustomTransitionPage(
-          key: state.pageKey,
-          child: const WhatsAppScreen(),
-          transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            return FadeTransition(opacity: animation, child: child);
-          },
-        ),
       ),
       GoRoute(
         path: AppRoutes.automations,
@@ -261,7 +240,10 @@ final routerProvider = Provider<GoRouter>((ref) {
           children: [
             const Icon(Icons.error_outline, size: 64, color: Colors.red),
             const SizedBox(height: 16),
-            Text('Page not found', style: Theme.of(context).textTheme.headlineSmall),
+            Text(
+              'Page not found',
+              style: Theme.of(context).textTheme.headlineSmall,
+            ),
             const SizedBox(height: 8),
             Text(state.error?.message ?? 'Unknown error'),
             const SizedBox(height: 24),

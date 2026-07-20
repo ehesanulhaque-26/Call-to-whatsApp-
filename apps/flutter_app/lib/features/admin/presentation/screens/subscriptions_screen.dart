@@ -7,7 +7,7 @@ class SubscriptionsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Subscriptions')),
-      body: Center(child: Text('No subscriptions yet')),
+      body: const Center(child: Text('No subscriptions yet')),
     );
   }
 }

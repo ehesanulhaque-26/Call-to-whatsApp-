@@ -3,8 +3,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/router/app_router.dart';
-import '../../../../core/theme/app_tokens.dart';
-import '../../../auth/presentation/providers/auth_provider.dart';
 
 /// Mobile-first user shell with bottom navigation
 class UserShell extends ConsumerStatefulWidget {
@@ -50,35 +48,34 @@ class _UserShellState extends ConsumerState<UserShell> {
   Widget build(BuildContext context) {
     final location = GoRouterState.of(context).matchedLocation;
     final selectedIndex = _getSelectedIndex(location);
-    final isAdmin = ref.watch(isAdminProvider);
 
     return Scaffold(
       body: widget.child,
       bottomNavigationBar: NavigationBar(
         selectedIndex: selectedIndex,
         onDestinationSelected: (index) => _onItemTapped(context, index),
-        destinations: [
-          const NavigationDestination(
+        destinations: const [
+          NavigationDestination(
             icon: Icon(Icons.home_outlined),
             selectedIcon: Icon(Icons.home),
             label: 'Home',
           ),
-          const NavigationDestination(
+          NavigationDestination(
             icon: Icon(Icons.phone_android_outlined),
             selectedIcon: Icon(Icons.phone_android),
             label: 'Sessions',
           ),
-          const NavigationDestination(
+          NavigationDestination(
             icon: Icon(Icons.contacts_outlined),
             selectedIcon: Icon(Icons.contacts),
             label: 'Contacts',
           ),
-          const NavigationDestination(
+          NavigationDestination(
             icon: Icon(Icons.notifications_outlined),
             selectedIcon: Icon(Icons.notifications),
             label: 'Alerts',
           ),
-          const NavigationDestination(
+          NavigationDestination(
             icon: Icon(Icons.person_outline),
             selectedIcon: Icon(Icons.person),
             label: 'Profile',

@@ -64,22 +64,25 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     if (hasSession) {
       // User has a session - fetch profile and navigate based on role
       developer.log('[Splash] Fetching profile...', name: 'Auth');
-      
+
       try {
         await ref.read(authProvider.notifier).checkAuthStatus();
       } catch (e) {
         developer.log('[Splash] Profile fetch error: $e', name: 'Auth');
       }
-      
+
       if (!mounted || _hasNavigated) return;
-      
+
       final authState = ref.read(authProvider);
       final isAdmin = authState.role == 'admin';
-      
-      developer.log('[Splash] Profile loaded, role=${authState.role}, isAdmin=$isAdmin', name: 'Auth');
-      
+
+      developer.log(
+        '[Splash] Profile loaded, role=${authState.role}, isAdmin=$isAdmin',
+        name: 'Auth',
+      );
+
       _hasNavigated = true;
-      
+
       if (isAdmin) {
         developer.log('[Splash] Navigating to /admin', name: 'Auth');
         context.go(AppRoutes.admin);

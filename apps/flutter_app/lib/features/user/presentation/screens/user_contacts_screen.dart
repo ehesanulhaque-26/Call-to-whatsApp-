@@ -23,8 +23,6 @@ class _UserContactsScreenState extends ConsumerState<UserContactsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Contacts'),
@@ -109,8 +107,8 @@ class _UserContactsScreenState extends ConsumerState<UserContactsScreen> {
             Text(
               _searchQuery.isNotEmpty ? 'No contacts found' : 'No contacts yet',
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+                    fontWeight: FontWeight.bold,
+                  ),
             ),
             const SizedBox(height: AppSpacing.sm),
             Text(
@@ -119,8 +117,8 @@ class _UserContactsScreenState extends ConsumerState<UserContactsScreen> {
                   : 'Sync your WhatsApp contacts to get started',
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: AppColors.textSecondary,
-              ),
+                    color: AppColors.textSecondary,
+                  ),
             ),
           ],
         ),
@@ -165,15 +163,15 @@ class _UserContactsScreenState extends ConsumerState<UserContactsScreen> {
             Text(
               contact['name'] ?? '',
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+                    fontWeight: FontWeight.bold,
+                  ),
             ),
             if (contact['pushname'] != null && contact['pushname']!.isNotEmpty)
               Text(
                 contact['pushname']!,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppColors.textSecondary,
-                ),
+                      color: AppColors.textSecondary,
+                    ),
               ),
             const SizedBox(height: AppSpacing.lg),
             ListTile(
@@ -243,17 +241,18 @@ class _ContactCard extends StatelessWidget {
         ),
         title: Text(
           name,
-          style: AppTypography.titleSmall?.copyWith(
+          style: AppTypography.titleSmall.copyWith(
             fontWeight: FontWeight.bold,
           ),
         ),
         subtitle: Text(
           contact['phone'] ?? '',
-          style: AppTypography.bodySmall?.copyWith(
+          style: AppTypography.bodySmall.copyWith(
             color: AppColors.textSecondary,
           ),
         ),
-        trailing: const Icon(Icons.chevron_right, color: AppColors.textTertiary),
+        trailing:
+            const Icon(Icons.chevron_right, color: AppColors.textTertiary),
       ),
     );
   }
