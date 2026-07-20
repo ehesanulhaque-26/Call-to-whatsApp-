@@ -1,0 +1,11 @@
+[railway]
+# Monorepo configuration for OpenWA SaaS
+# Backend is located in apps/backend
+
+[deploy]
+# Railway will use the Dockerfile at the root for building
+# Dockerfile handles the monorepo structure by explicitly copying from apps/backend
+
+[build]
+# Use Dockerfile for building
+builder = "docker"
