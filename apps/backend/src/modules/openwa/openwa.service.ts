@@ -62,37 +62,37 @@ export class OpenWAService {
 
   // Health Check
   async healthCheck(): Promise<{ status: string; timestamp: string }> {
-    return this.request('GET', '/health');
+    return this.request('GET', '/api/health');
   }
 
   // Session Management
   async createSession(sessionId?: string): Promise<OpenWASession> {
     const payload = sessionId ? { sessionId } : {};
-    return this.request<OpenWASession>('POST', '/sessions', payload);
+    return this.request<OpenWASession>('POST', '/api/sessions', payload);
   }
 
   async deleteSession(sessionId: string): Promise<{ success: boolean }> {
-    return this.request('DELETE', `/sessions/${sessionId}`);
+    return this.request('DELETE', `/api/sessions/${sessionId}`);
   }
 
   async getSession(sessionId: string): Promise<OpenWASession> {
-    return this.request<OpenWASession>('GET', `/sessions/${sessionId}`);
+    return this.request<OpenWASession>('GET', `/api/sessions/${sessionId}`);
   }
 
   async getSessionStatus(sessionId: string): Promise<OpenWASessionStatus> {
-    return this.request<OpenWASessionStatus>('GET', `/sessions/${sessionId}/status`);
+    return this.request<OpenWASessionStatus>('GET', `/api/sessions/${sessionId}/status`);
   }
 
   async getQRCode(sessionId: string): Promise<{ qr: string }> {
-    return this.request<{ qr: string }>('GET', `/sessions/${sessionId}/qr`);
+    return this.request<{ qr: string }>('GET', `/api/sessions/${sessionId}/qr`);
   }
 
   async reconnectSession(sessionId: string): Promise<{ success: boolean }> {
-    return this.request('POST', `/sessions/${sessionId}/reconnect`);
+    return this.request('POST', `/api/sessions/${sessionId}/reconnect`);
   }
 
   async logoutSession(sessionId: string): Promise<{ success: boolean }> {
-    return this.request('POST', `/sessions/${sessionId}/logout`);
+    return this.request('POST', `/api/sessions/${sessionId}/logout`);
   }
 
   // Messaging
@@ -101,7 +101,7 @@ export class OpenWAService {
     to: string,
     text: string,
   ): Promise<OpenWASendMessageResult> {
-    return this.request<OpenWASendMessageResult>('POST', `/sessions/${sessionId}/send-text`, {
+    return this.request<OpenWASendMessageResult>('POST', `/api/sessions/${sessionId}/send-text`, {
       to,
       text,
     });
@@ -114,7 +114,7 @@ export class OpenWAService {
     caption?: string,
     mimetype?: string,
   ): Promise<OpenWASendMessageResult> {
-    return this.request<OpenWASendMessageResult>('POST', `/sessions/${sessionId}/send-media`, {
+    return this.request<OpenWASendMessageResult>('POST', `/api/sessions/${sessionId}/send-media`, {
       to,
       mediaUrl,
       caption,
@@ -124,29 +124,29 @@ export class OpenWAService {
 
   // Chats & Contacts
   async getChats(sessionId: string): Promise<{ chats: unknown[] }> {
-    return this.request<{ chats: unknown[] }>('GET', `/sessions/${sessionId}/chats`);
+    return this.request<{ chats: unknown[] }>('GET', `/api/sessions/${sessionId}/chats`);
   }
 
   async getContacts(sessionId: string): Promise<{ contacts: unknown[] }> {
-    return this.request<{ contacts: unknown[] }>('GET', `/sessions/${sessionId}/contacts`);
+    return this.request<{ contacts: unknown[] }>('GET', `/api/sessions/${sessionId}/contacts`);
   }
 
   async getContact(sessionId: string, contactId: string): Promise<unknown> {
-    return this.request('GET', `/sessions/${sessionId}/contacts/${contactId}`);
+    return this.request('GET', `/api/sessions/${sessionId}/contacts/${contactId}`);
   }
 
   // Groups
   async getGroups(sessionId: string): Promise<{ groups: unknown[] }> {
-    return this.request<{ groups: unknown[] }>('GET', `/sessions/${sessionId}/groups`);
+    return this.request<{ groups: unknown[] }>('GET', `/api/sessions/${sessionId}/groups`);
   }
 
   async getGroup(sessionId: string, groupId: string): Promise<unknown> {
-    return this.request('GET', `/sessions/${sessionId}/groups/${groupId}`);
+    return this.request('GET', `/api/sessions/${sessionId}/groups/${groupId}`);
   }
 
   // Templates
   async getTemplates(sessionId: string): Promise<{ templates: unknown[] }> {
-    return this.request<{ templates: unknown[] }>('GET', `/sessions/${sessionId}/templates`);
+    return this.request<{ templates: unknown[] }>('GET', `/api/sessions/${sessionId}/templates`);
   }
 
   async sendTemplateMessage(
@@ -155,7 +155,7 @@ export class OpenWAService {
     templateName: string,
     templateData?: Record<string, string>,
   ): Promise<OpenWASendMessageResult> {
-    return this.request<OpenWASendMessageResult>('POST', `/sessions/${sessionId}/send-template`, {
+    return this.request<OpenWASendMessageResult>('POST', `/api/sessions/${sessionId}/send-template`, {
       to,
       templateName,
       templateData,
