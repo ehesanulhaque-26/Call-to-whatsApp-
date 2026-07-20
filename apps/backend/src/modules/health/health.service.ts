@@ -79,13 +79,15 @@ export class HealthService {
     const openwaUrl =
       this.configService.get<string>('OPENWA_URL') || 'http://openwa.railway.internal';
 
+    this.logger.warn(`[Health] Starting OpenWA check using URL: ${openwaUrl}`);
+
     try {
-      this.logger.debug(`Checking OpenWA connectivity at ${openwaUrl}/api/health`);
+      this.logger.warn(`[Health] Calling OpenWAService.healthCheck()...`);
       const result = await this.openWAService.healthCheck();
       const latency = Date.now() - start;
 
-      this.logger.log(
-        `OpenWA health check successful - Status: ${result.status}, Latency: ${latency}ms`,
+      this.logger.warn(
+        `[Health] OpenWA check SUCCESS - Response: ${JSON.stringify(result)}, Latency: ${latency}ms`,
       );
 
       return {
@@ -95,12 +97,13 @@ export class HealthService {
       };
     } catch (error) {
       const latency = Date.now() - start;
-      this.logger.error(`OpenWA health check failed after ${latency}ms: ${error}`);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      this.logger.error(`[Health] OpenWA check FAILED after ${latency}ms: ${errorMessage}`);
 
       return {
         status: 'down',
         latency,
-        message: `OpenWA unreachable at ${openwaUrl}`,
+        message: `OpenWA unreachable at ${openwaUrl}: ${errorMessage}`,
       };
     }
   }
