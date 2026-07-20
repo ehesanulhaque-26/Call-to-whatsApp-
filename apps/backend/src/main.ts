@@ -1,23 +1,20 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
+import { ValidationPipe, Logger } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
-import { ConfigService } from '@nestjs/config';
-import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 
 async function bootstrap() {
+  const logger = new Logger('Bootstrap');
+
   const app = await NestFactory.create(AppModule);
 
-  const configService = app.get(ConfigService);
-
-  // Enable CORS
+  // Enable CORS for Flutter and WebSocket
   app.enableCors({
-    origin: true,
+    origin: '*',
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Bearer'],
   });
-
-  // Global prefix for API
-  app.setGlobalPrefix('api/v1');
 
   // Global validation pipe
   app.useGlobalPipes(
@@ -25,35 +22,32 @@ async function bootstrap() {
       whitelist: true,
       forbidNonWhitelisted: true,
       transform: true,
-      transformOptions: {
-        enableImplicitConversion: true,
-      },
     }),
   );
 
-  // Global exception filter
-  app.useGlobalFilters(new HttpExceptionFilter());
-
-  // Swagger setup
-  const swaggerConfig = new DocumentBuilder()
+  // Swagger documentation
+  const config = new DocumentBuilder()
     .setTitle('OpenWA SaaS API')
-    .setDescription('OpenWA SaaS Backend API Documentation')
+    .setDescription('Multi-tenant WhatsApp API for SaaS applications')
     .setVersion('1.0')
     .addBearerAuth()
     .addTag('auth', 'Authentication endpoints')
-    .addTag('users', 'User management endpoints')
-    .addTag('health', 'Health check endpoints')
-    .addTag('openwa', 'OpenWA integration endpoints')
+    .addTag('users', 'User management')
+    .addTag('sessions', 'WhatsApp session management')
+    .addTag('admin-sessions', 'Admin session management')
+    .addTag('openwa', 'OpenWA integration')
+    .addTag('health', 'Health checks')
     .build();
 
-  const document = SwaggerModule.createDocument(app, swaggerConfig);
-  SwaggerModule.setup('docs', app, document);
+  const document = SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup('api/docs', app, document);
 
-  const port = configService.get<number>('PORT', 3000);
+  const port = process.env.PORT || 3000;
   await app.listen(port);
 
-  console.log(`Application is running on: http://localhost:${port}`);
-  console.log(`Swagger documentation: http://localhost:${port}/docs`);
+  logger.log(`Application running on port ${port}`);
+  logger.log(`Swagger documentation: http://localhost:${port}/api/docs`);
+  logger.log(`WebSocket endpoint: ws://localhost:${port}/openwa`);
 }
 
 bootstrap();

@@ -397,7 +397,7 @@ class HomeScreen extends ConsumerWidget {
             Consumer(
               builder: (context, ref, _) {
                 final whatsAppState = ref.watch(whatsAppProvider);
-                final isHealthy = whatsAppState.openWAHealthy;
+                final isHealthy = whatsAppState.isConnected;
 
                 return Card(
                   child: ListTile(

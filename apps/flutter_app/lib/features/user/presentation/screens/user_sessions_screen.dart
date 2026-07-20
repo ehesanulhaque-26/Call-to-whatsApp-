@@ -17,7 +17,7 @@ class UserSessionsScreen extends ConsumerStatefulWidget {
 class _UserSessionsScreenState extends ConsumerState<UserSessionsScreen> {
   @override
   Widget build(BuildContext context) {
-    final sessionsAsync = ref.watch(sessionsProvider);
+    final sessionsAsync = ref.watch(sessionsAsyncProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -58,8 +58,8 @@ class _UserSessionsScreenState extends ConsumerState<UserSessionsScreen> {
               itemBuilder: (context, index) {
                 final session = sessions[index];
                 return _SessionCard(
-                  session: session,
-                  onTap: () => _showSessionDetails(context, session),
+                  session: session.toOpenWASession(),
+                  onTap: () => _showSessionDetails(context, session.toOpenWASession()),
                 );
               },
             ),

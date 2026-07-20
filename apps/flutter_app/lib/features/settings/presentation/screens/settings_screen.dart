@@ -98,25 +98,25 @@ class SettingsScreen extends ConsumerWidget {
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
-                    color: whatsAppState.openWAHealthy
+                    color: whatsAppState.isConnected
                         ? AppColors.success.withOpacity(0.1)
                         : AppColors.error.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(AppRadius.md),
                   ),
                   child: Icon(
-                    whatsAppState.openWAHealthy
+                    whatsAppState.isConnected
                         ? Icons.cloud_done
                         : Icons.cloud_off,
-                    color: whatsAppState.openWAHealthy
+                    color: whatsAppState.isConnected
                         ? AppColors.success
                         : AppColors.error,
                   ),
                 ),
                 title: const Text('Backend Status'),
                 subtitle: Text(
-                  whatsAppState.openWAHealthy ? 'Operational' : 'Unavailable',
+                  whatsAppState.isConnected ? 'Operational' : 'Unavailable',
                   style: TextStyle(
-                    color: whatsAppState.openWAHealthy
+                    color: whatsAppState.isConnected
                         ? AppColors.success
                         : AppColors.error,
                   ),
@@ -125,7 +125,7 @@ class SettingsScreen extends ConsumerWidget {
                   width: 12,
                   height: 12,
                   decoration: BoxDecoration(
-                    color: whatsAppState.openWAHealthy
+                    color: whatsAppState.isConnected
                         ? AppColors.success
                         : AppColors.error,
                     shape: BoxShape.circle,

@@ -1,28 +1,26 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { AppConfigModule } from './config/config.module';
+import { HealthModule } from './modules/health/health.module';
 import { SupabaseModule } from './modules/supabase/supabase.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
 import { RolesModule } from './modules/roles/roles.module';
 import { OpenWAModule } from './modules/openwa/openwa.module';
-import { HealthModule } from './modules/health/health.module';
+import { SessionManagerModule } from './modules/session-manager/session-manager.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: ['.env.local', '.env'],
+      envFilePath: ['.env', '.env.local', '.env.production'],
     }),
-    AppConfigModule,
     SupabaseModule,
+    HealthModule,
     AuthModule,
     UsersModule,
     RolesModule,
     OpenWAModule,
-    HealthModule,
+    SessionManagerModule,
   ],
-  controllers: [],
-  providers: [],
 })
 export class AppModule {}

@@ -18,7 +18,7 @@ class WhatsAppScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('WhatsApp'),
         actions: [
-          if (whatsAppState.openWAHealthy)
+          if (whatsAppState.isConnected)
             Padding(
               padding: const EdgeInsets.only(right: AppSpacing.md),
               child: Container(
@@ -69,14 +69,14 @@ class WhatsAppScreen extends ConsumerWidget {
           onConnect: () => ref.read(whatsAppProvider.notifier).connect(),
           isLoading: state.isLoading,
           error: state.error,
-          openWAHealthy: state.openWAHealthy,
+          openWAHealthy: state.isConnected,
         );
       case WhatsAppConnectionState.creating:
         return const _CreatingConnectionState();
       case WhatsAppConnectionState.qrReady:
         return _QRReadyState(
           qrCode: state.connection?.qrCode,
-          onRefresh: () => ref.read(whatsAppProvider.notifier).refreshQR(),
+          onRefresh: () => ref.read(whatsAppProvider.notifier).refreshQR(state.connection?.sessionId ?? ""),
           isLoading: state.isLoading,
         );
       case WhatsAppConnectionState.connecting:
@@ -84,10 +84,9 @@ class WhatsAppScreen extends ConsumerWidget {
       case WhatsAppConnectionState.connected:
         return _ConnectedState(
           connection: state.connection!,
-          onReconnect: () => ref.read(whatsAppProvider.notifier).reconnect(),
+          onReconnect: () => ref.read(whatsAppProvider.notifier).reconnect(state.connection?.sessionId ?? ""),
           onDisconnect: () => ref.read(whatsAppProvider.notifier).disconnect(),
-          onDelete: () =>
-              ref.read(whatsAppProvider.notifier).deleteConnection(),
+          onDelete: () => ref.read(whatsAppProvider.notifier).deleteConnection(state.connection?.sessionId ?? ""),
         );
     }
   }
