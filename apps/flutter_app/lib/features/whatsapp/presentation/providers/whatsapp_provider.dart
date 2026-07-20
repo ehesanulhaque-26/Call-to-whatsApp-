@@ -508,7 +508,7 @@ class WhatsAppNotifier extends StateNotifier<WhatsAppState> {
         final qr = statusData['qr'] as String?;
         final phone = statusData['phone'] as String?;
         
-        final status = _parseStatus(sessionState);
+        final status = WhatsAppNotifier._parseStatus(sessionState);
         _updateSessionStatus(sessionId, status, qrCode: qr, phone: phone);
       }
     } catch (e) {
