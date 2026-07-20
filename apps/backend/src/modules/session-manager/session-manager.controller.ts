@@ -58,10 +58,7 @@ export class SessionManagerController {
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create a new session' })
   @ApiResponse({ status: 201, description: 'Session created' })
-  async createSession(
-    @Req() req: AuthenticatedRequest,
-    @Body('sessionName') sessionName?: string,
-  ) {
+  async createSession(@Req() req: AuthenticatedRequest, @Body('sessionName') sessionName?: string) {
     const session = await this.sessionManager.createSession(req.user.userId, sessionName);
 
     await this.activityLogService.log({
@@ -314,9 +311,8 @@ export class AdminSessionController {
 
     return {
       totalSessions: allSessions.length,
-      connectedSessions: allSessions.filter(
-        (s) => s.status === 'connected' || s.status === 'ready',
-      ).length,
+      connectedSessions: allSessions.filter((s) => s.status === 'connected' || s.status === 'ready')
+        .length,
       disconnectedSessions: allSessions.filter(
         (s) => s.status === 'disconnected' || s.status === 'destroyed',
       ).length,

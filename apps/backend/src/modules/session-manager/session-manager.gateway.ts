@@ -8,7 +8,7 @@ import {
   MessageBody,
   ConnectedSocket,
 } from '@nestjs/websockets';
-import { Logger, UseGuards } from '@nestjs/common';
+import { Logger } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -28,7 +28,9 @@ interface AuthenticatedSocket extends Socket {
   },
   namespace: '/openwa',
 })
-export class SessionManagerGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
+export class SessionManagerGateway
+  implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
+{
   private readonly logger = new Logger(SessionManagerGateway.name);
   private userSockets: Map<string, Set<string>> = new Map();
 
@@ -47,7 +49,9 @@ export class SessionManagerGateway implements OnGatewayInit, OnGatewayConnection
 
   async handleConnection(client: AuthenticatedSocket): Promise<void> {
     try {
-      const token = client.handshake.auth?.token || client.handshake.headers?.authorization?.replace('Bearer ', '');
+      const token =
+        client.handshake.auth?.token ||
+        client.handshake.headers?.authorization?.replace('Bearer ', '');
 
       if (!token) {
         this.logger.warn(`Client ${client.id} connected without token`);
@@ -56,17 +60,21 @@ export class SessionManagerGateway implements OnGatewayInit, OnGatewayConnection
         return;
       }
 
-      const decoded = await this.jwtService.verifyAsync(token, {
-        secret: this.configService.get<string>('JWT_SECRET'),
-      }).catch(() => null);
+      const decoded = await this.jwtService
+        .verifyAsync(token, {
+          secret: this.configService.get<string>('JWT_SECRET'),
+        })
+        .catch(() => null);
 
       if (!decoded) {
         // Try Supabase token
         const supabaseToken = this.configService.get<string>('SUPABASE_JWT_SECRET');
         if (supabaseToken) {
-          const supabaseDecoded = await this.jwtService.verifyAsync(token, {
-            secret: supabaseToken,
-          }).catch(() => null);
+          const supabaseDecoded = await this.jwtService
+            .verifyAsync(token, {
+              secret: supabaseToken,
+            })
+            .catch(() => null);
 
           if (supabaseDecoded) {
             client.userId = supabaseDecoded.sub || supabaseDecoded.user_id;
@@ -336,7 +344,8 @@ export class SessionManagerGateway implements OnGatewayInit, OnGatewayConnection
     const allSessions = this.sessionManager.getAllSessions();
     const stats = {
       totalSessions: allSessions.length,
-      connectedSessions: allSessions.filter((s) => s.status === 'connected' || s.status === 'ready').length,
+      connectedSessions: allSessions.filter((s) => s.status === 'connected' || s.status === 'ready')
+        .length,
       disconnectedSessions: allSessions.filter((s) => s.status === 'disconnected').length,
       totalMessages: allSessions.reduce((sum, s) => sum + s.messageCount, 0),
       sessions: allSessions.map((s) => ({

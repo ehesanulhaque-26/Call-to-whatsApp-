@@ -504,11 +504,11 @@ class WhatsAppNotifier extends StateNotifier<WhatsAppState> {
       
       if (response.data != null) {
         final statusData = response.data!;
-        final state_str = statusData['state'] as String? ?? 'DISCONNECTED';
+        final sessionState = statusData['state'] as String? ?? 'DISCONNECTED';
         final qr = statusData['qr'] as String?;
         final phone = statusData['phone'] as String?;
         
-        final status = WhatsAppSession._parseStatus(state_str);
+        final status = _parseStatus(sessionState);
         _updateSessionStatus(sessionId, status, qrCode: qr, phone: phone);
       }
     } catch (e) {

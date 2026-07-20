@@ -8,9 +8,10 @@ on:
 
 env:
   FLUTTER_VERSION: '3.24.0'
-  NODE_VERSION: '20'
+  NODE_VERSION: '22'
   SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
   SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+  BACKEND_URL: 'https://openwa-production-d8f8.up.railway.app'
 
 jobs:
   flutter-analyze:
@@ -86,14 +87,18 @@ jobs:
           cd apps/flutter_app
           flutter build apk --debug \
             --dart-define=SUPABASE_URL="${{ env.SUPABASE_URL }}" \
-            --dart-define=SUPABASE_ANON_KEY="${{ env.SUPABASE_ANON_KEY }}"
+            --dart-define=SUPABASE_ANON_KEY="${{ env.SUPABASE_ANON_KEY }}" \
+            --dart-define=API_BASE_URL="${{ env.BACKEND_URL }}/api/v1" \
+            --dart-define=WS_URL="${{ env.BACKEND_URL }}/openwa"
 
       - name: Build Release APK
         run: |
           cd apps/flutter_app
           flutter build apk --release \
             --dart-define=SUPABASE_URL="${{ env.SUPABASE_URL }}" \
-            --dart-define=SUPABASE_ANON_KEY="${{ env.SUPABASE_ANON_KEY }}"
+            --dart-define=SUPABASE_ANON_KEY="${{ env.SUPABASE_ANON_KEY }}" \
+            --dart-define=API_BASE_URL="${{ env.BACKEND_URL }}/api/v1" \
+            --dart-define=WS_URL="${{ env.BACKEND_URL }}/openwa"
 
       - name: Upload Debug APK
         uses: actions/upload-artifact@v4

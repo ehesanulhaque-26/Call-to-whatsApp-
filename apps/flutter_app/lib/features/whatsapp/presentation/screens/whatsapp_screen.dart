@@ -62,9 +62,8 @@ class WhatsAppScreen extends ConsumerWidget {
     WhatsAppState state,
     WhatsAppConnectionState connectionState,
   ) {
-    // Check if there's a QR code ready or connected session
+    // Check if there's a QR code ready
     final hasQrCode = state.sessions.any((s) => s.qrCode != null);
-    final hasConnectedSession = state.sessions.any((s) => s.status == WhatsAppStatus.connected);
     final activeSession = state.activeSession;
 
     switch (connectionState) {

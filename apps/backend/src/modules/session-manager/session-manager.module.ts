@@ -1,4 +1,4 @@
-import { Module, forwardRef } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
@@ -22,11 +22,7 @@ import { SupabaseModule } from '../supabase/supabase.module';
     }),
   ],
   controllers: [SessionManagerController, AdminSessionController],
-  providers: [
-    SessionManagerService,
-    SessionManagerGateway,
-    ActivityLogService,
-  ],
+  providers: [SessionManagerService, SessionManagerGateway, ActivityLogService],
   exports: [SessionManagerService, ActivityLogService],
 })
 export class SessionManagerModule {}
