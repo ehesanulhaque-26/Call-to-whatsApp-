@@ -6,10 +6,6 @@
 # Use Dockerfile for building
 builder = "DOCKERFILE"
 
-[deploy]
-# Start command runs the compiled backend from apps/backend
-startCommand = "cd apps/backend && node dist/main"
-
 [healthcheck]
 # Railway healthcheck path
 path = "/api/v1/health"
