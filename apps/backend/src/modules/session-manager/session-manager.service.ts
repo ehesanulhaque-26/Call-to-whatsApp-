@@ -1,7 +1,7 @@
 import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import axios, { AxiosInstance } from 'axios';
+import axios, { AxiosInstance, AxiosError } from 'axios';
 import * as fs from 'fs';
 import * as path from 'path';
 import { v4 as uuidv4 } from 'uuid';
@@ -57,8 +57,11 @@ export class SessionManagerService implements OnModuleInit, OnModuleDestroy {
     private readonly configService: ConfigService,
     private readonly eventEmitter: EventEmitter2,
   ) {
-    this.baseURL = this.configService.get<string>('OPENWA_URL') || 'http://localhost:8080';
+    // Use Railway private URL for service-to-service communication
+    this.baseURL = this.configService.get<string>('OPENWA_URL') || 'http://openwa.railway.internal';
     this.sessionStoragePath = this.configService.get<string>('OPENWA_SESSION_PATH') || './sessions';
+    
+    this.logger.log(`[SessionManager] Initialized with OpenWA base URL: ${this.baseURL}`);
     this.ensureStorageDirectory();
   }
 
@@ -137,7 +140,7 @@ export class SessionManagerService implements OnModuleInit, OnModuleDestroy {
   private createClient(): AxiosInstance {
     return axios.create({
       baseURL: this.baseURL,
-      timeout: 30000,
+      timeout: 60000, // 60 second timeout for WhatsApp operations
       headers: { 'Content-Type': 'application/json' },
     });
   }
@@ -159,11 +162,29 @@ export class SessionManagerService implements OnModuleInit, OnModuleDestroy {
     reqPath: string,
     data?: unknown,
   ): Promise<T> {
+    const fullUrl = `${this.baseURL}${reqPath}`;
+    this.logger.debug(`[OpenWA] ${method} ${fullUrl} - Request: ${data ? JSON.stringify(data) : 'none'}`);
+    
     try {
+      const startTime = Date.now();
       const response = await client.request<T>({ method, url: reqPath, data });
+      const duration = Date.now() - startTime;
+      
+      this.logger.log(`[OpenWA] ${method} ${reqPath} - Status: ${response.status} - Duration: ${duration}ms`);
       return response.data;
     } catch (error) {
-      this.logger.error(`OpenWA API error: ${method} ${reqPath}`, error);
+      const axiosError = error as AxiosError;
+      
+      if (axiosError.code === 'ECONNREFUSED') {
+        this.logger.error(`[OpenWA] ${method} ${reqPath} - Connection refused to ${this.baseURL}`);
+      } else if (axiosError.code === 'ETIMEDOUT' || axiosError.code === 'ECONNABORTED') {
+        this.logger.error(`[OpenWA] ${method} ${reqPath} - Timeout`);
+      } else if (axiosError.response) {
+        this.logger.error(`[OpenWA] ${method} ${reqPath} - HTTP ${axiosError.response.status}: ${JSON.stringify(axiosError.response.data)}`);
+      } else {
+        this.logger.error(`[OpenWA] ${method} ${reqPath} - Error: ${axiosError.message}`);
+      }
+      
       throw error;
     }
   }
@@ -175,7 +196,7 @@ export class SessionManagerService implements OnModuleInit, OnModuleDestroy {
       this.logger.log(`Session ${sessionId} already exists`);
       return existingClient;
     }
-    this.logger.log(`Creating session: ${sessionId} for user: ${userId}`);
+    this.logger.log(`[SessionManager] Creating session: ${sessionId} for user: ${userId}`);
     const client = this.createClient();
     const openWAClient: OpenWAClient = {
       sessionId,
@@ -191,10 +212,10 @@ export class SessionManagerService implements OnModuleInit, OnModuleDestroy {
     this.emitEvent(sessionId, userId, SessionStatus.CREATED);
     this.emitEvent(sessionId, userId, SessionStatus.LOADING);
     try {
-      await this.request<{ sessionId: string }>(client, 'POST', '/sessions', { sessionId });
-      this.logger.log(`Session ${sessionId} created in OpenWA`);
+      await this.request<{ sessionId: string }>(client, 'POST', '/api/sessions', { sessionId });
+      this.logger.log(`[SessionManager] Session ${sessionId} created in OpenWA`);
     } catch (error) {
-      this.logger.error(`Failed to create session in OpenWA: ${sessionId}`, error);
+      this.logger.error(`[SessionManager] Failed to create session in OpenWA: ${sessionId}`, error);
       this.emitEvent(sessionId, userId, SessionStatus.ERROR, { error: 'Failed to create session' });
     }
     return openWAClient;
@@ -210,7 +231,7 @@ export class SessionManagerService implements OnModuleInit, OnModuleDestroy {
       const status = await this.request<{ state: string; qr?: string }>(
         openWAClient.client,
         'GET',
-        `/sessions/${sessionId}/status`,
+        `/api/sessions/${sessionId}/status`,
       );
       switch (status.state) {
         case 'CONNECTED':
@@ -517,7 +538,7 @@ export class SessionManagerService implements OnModuleInit, OnModuleDestroy {
       const result = await this.request<Record<string, unknown>>(
         openWAClient.client,
         'POST',
-        `/sessions/${sessionId}/send-text`,
+        `/api/sessions/${sessionId}/send-text`,
         { to, text },
       );
       openWAClient.messageCount++;
@@ -554,7 +575,7 @@ export class SessionManagerService implements OnModuleInit, OnModuleDestroy {
       const result = await this.request<Record<string, unknown>>(
         openWAClient.client,
         'POST',
-        `/sessions/${sessionId}/send-media`,
+        `/api/sessions/${sessionId}/send-media`,
         { to, mediaUrl, caption, mimetype },
       );
       openWAClient.messageCount++;
@@ -599,7 +620,7 @@ export class SessionManagerService implements OnModuleInit, OnModuleDestroy {
     const openWAClient = this.getClientBySessionId(sessionId);
     if (!openWAClient || openWAClient.userId !== userId)
       throw new Error('Session not found or access denied');
-    this.logger.log(`Syncing contacts for session: ${sessionId}`);
+    this.logger.log(`[SessionManager] Syncing contacts for session: ${sessionId}`);
     this.emitEvent(sessionId, userId, SessionStatus.READY, {
       type: 'contact_sync_progress',
       progress: 0,
@@ -608,7 +629,7 @@ export class SessionManagerService implements OnModuleInit, OnModuleDestroy {
       const response = await this.request<{ contacts: Array<Record<string, unknown>> }>(
         openWAClient.client,
         'GET',
-        `/sessions/${sessionId}/contacts`,
+        `/api/sessions/${sessionId}/contacts`,
       );
       this.emitEvent(sessionId, userId, SessionStatus.READY, {
         type: 'contact_sync_complete',
@@ -629,7 +650,7 @@ export class SessionManagerService implements OnModuleInit, OnModuleDestroy {
       const response = await this.request<{ chats: Array<Record<string, unknown>> }>(
         openWAClient.client,
         'GET',
-        `/sessions/${sessionId}/chats`,
+        `/api/sessions/${sessionId}/chats`,
       );
       return response.chats || [];
     } catch (error) {
@@ -646,7 +667,7 @@ export class SessionManagerService implements OnModuleInit, OnModuleDestroy {
       const response = await this.request<{ contacts: Array<Record<string, unknown>> }>(
         openWAClient.client,
         'GET',
-        `/sessions/${sessionId}/contacts`,
+        `/api/sessions/${sessionId}/contacts`,
       );
       return response.contacts || [];
     } catch (error) {
