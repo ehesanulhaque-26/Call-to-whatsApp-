@@ -39,8 +39,10 @@ export class HealthService {
     const allDown = dbStatus.status === 'down' && openwaStatus.status === 'down';
 
     const status = allUp ? 'healthy' : allDown ? 'unhealthy' : 'degraded';
-    
-    this.logger.log(`Health check: ${status} - DB: ${dbStatus.status}, OpenWA: ${openwaStatus.status}`);
+
+    this.logger.log(
+      `Health check: ${status} - DB: ${dbStatus.status}, OpenWA: ${openwaStatus.status}`,
+    );
 
     return {
       status,
@@ -74,15 +76,18 @@ export class HealthService {
 
   private async checkOpenWA(): Promise<ServiceStatus> {
     const start = Date.now();
-    const openwaUrl = this.configService.get<string>('OPENWA_URL') || 'http://openwa.railway.internal';
-    
+    const openwaUrl =
+      this.configService.get<string>('OPENWA_URL') || 'http://openwa.railway.internal';
+
     try {
       this.logger.debug(`Checking OpenWA connectivity at ${openwaUrl}/api/health`);
       const result = await this.openWAService.healthCheck();
       const latency = Date.now() - start;
-      
-      this.logger.log(`OpenWA health check successful - Status: ${result.status}, Latency: ${latency}ms`);
-      
+
+      this.logger.log(
+        `OpenWA health check successful - Status: ${result.status}, Latency: ${latency}ms`,
+      );
+
       return {
         status: 'up',
         latency,
@@ -91,7 +96,7 @@ export class HealthService {
     } catch (error) {
       const latency = Date.now() - start;
       this.logger.error(`OpenWA health check failed after ${latency}ms: ${error}`);
-      
+
       return {
         status: 'down',
         latency,
@@ -103,7 +108,7 @@ export class HealthService {
   async getReadiness(): Promise<{ ready: boolean }> {
     const dbStatus = await this.checkDatabase();
     const openwaStatus = await this.checkOpenWA();
-    
+
     return {
       ready: dbStatus.status === 'up' && openwaStatus.status === 'up',
     };

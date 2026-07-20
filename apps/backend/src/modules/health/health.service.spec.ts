@@ -58,6 +58,10 @@ describe('HealthService', () => {
   describe('getReadiness', () => {
     it('should return ready true when database is up', async () => {
       mockSupabaseService.query.mockResolvedValue([]);
+      mockOpenWAService.healthCheck.mockResolvedValue({
+        status: 'ok',
+        timestamp: new Date().toISOString(),
+      });
 
       const result = await service.getReadiness();
 
@@ -77,7 +81,10 @@ describe('HealthService', () => {
   describe('getHealth', () => {
     it('should return healthy status when all services are up', async () => {
       mockSupabaseService.query.mockResolvedValue([]);
-      mockOpenWAService.healthCheck.mockResolvedValue(undefined);
+      mockOpenWAService.healthCheck.mockResolvedValue({
+        status: 'ok',
+        timestamp: new Date().toISOString(),
+      });
 
       const result = await service.getHealth();
 
@@ -113,7 +120,10 @@ describe('HealthService', () => {
 
     it('should include latency for healthy services', async () => {
       mockSupabaseService.query.mockResolvedValue([]);
-      mockOpenWAService.healthCheck.mockResolvedValue(undefined);
+      mockOpenWAService.healthCheck.mockResolvedValue({
+        status: 'ok',
+        timestamp: new Date().toISOString(),
+      });
 
       const result = await service.getHealth();
 

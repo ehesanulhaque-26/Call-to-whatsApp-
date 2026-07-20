@@ -60,7 +60,7 @@ export class SessionManagerService implements OnModuleInit, OnModuleDestroy {
     // Use Railway private URL for service-to-service communication
     this.baseURL = this.configService.get<string>('OPENWA_URL') || 'http://openwa.railway.internal';
     this.sessionStoragePath = this.configService.get<string>('OPENWA_SESSION_PATH') || './sessions';
-    
+
     this.logger.log(`[SessionManager] Initialized with OpenWA base URL: ${this.baseURL}`);
     this.ensureStorageDirectory();
   }
@@ -163,28 +163,34 @@ export class SessionManagerService implements OnModuleInit, OnModuleDestroy {
     data?: unknown,
   ): Promise<T> {
     const fullUrl = `${this.baseURL}${reqPath}`;
-    this.logger.debug(`[OpenWA] ${method} ${fullUrl} - Request: ${data ? JSON.stringify(data) : 'none'}`);
-    
+    this.logger.debug(
+      `[OpenWA] ${method} ${fullUrl} - Request: ${data ? JSON.stringify(data) : 'none'}`,
+    );
+
     try {
       const startTime = Date.now();
       const response = await client.request<T>({ method, url: reqPath, data });
       const duration = Date.now() - startTime;
-      
-      this.logger.log(`[OpenWA] ${method} ${reqPath} - Status: ${response.status} - Duration: ${duration}ms`);
+
+      this.logger.log(
+        `[OpenWA] ${method} ${reqPath} - Status: ${response.status} - Duration: ${duration}ms`,
+      );
       return response.data;
     } catch (error) {
       const axiosError = error as AxiosError;
-      
+
       if (axiosError.code === 'ECONNREFUSED') {
         this.logger.error(`[OpenWA] ${method} ${reqPath} - Connection refused to ${this.baseURL}`);
       } else if (axiosError.code === 'ETIMEDOUT' || axiosError.code === 'ECONNABORTED') {
         this.logger.error(`[OpenWA] ${method} ${reqPath} - Timeout`);
       } else if (axiosError.response) {
-        this.logger.error(`[OpenWA] ${method} ${reqPath} - HTTP ${axiosError.response.status}: ${JSON.stringify(axiosError.response.data)}`);
+        this.logger.error(
+          `[OpenWA] ${method} ${reqPath} - HTTP ${axiosError.response.status}: ${JSON.stringify(axiosError.response.data)}`,
+        );
       } else {
         this.logger.error(`[OpenWA] ${method} ${reqPath} - Error: ${axiosError.message}`);
       }
-      
+
       throw error;
     }
   }

@@ -47,11 +47,13 @@ export class OpenWAService {
 
   private async request<T>(method: string, path: string, data?: unknown): Promise<T> {
     const fullUrl = `${this.baseURL}${path}`;
-    
-    this.logger.debug(`[OpenWA] ${method} ${fullUrl} - Request: ${data ? JSON.stringify(data) : 'none'}`);
-    
+
+    this.logger.debug(
+      `[OpenWA] ${method} ${fullUrl} - Request: ${data ? JSON.stringify(data) : 'none'}`,
+    );
+
     const startTime = Date.now();
-    
+
     try {
       const response = await this.client.request<T>({
         method,
@@ -59,29 +61,35 @@ export class OpenWAService {
         data,
       });
       const duration = Date.now() - startTime;
-      
-      this.logger.log(`[OpenWA] ${method} ${path} - Status: ${response.status} - Duration: ${duration}ms`);
+
+      this.logger.log(
+        `[OpenWA] ${method} ${path} - Status: ${response.status} - Duration: ${duration}ms`,
+      );
       this.logger.debug(`[OpenWA] Response: ${JSON.stringify(response.data)}`);
-      
+
       return response.data;
     } catch (error) {
       const axiosError = error as AxiosError;
       const duration = Date.now() - startTime;
-      
+
       if (axiosError.code === 'ECONNREFUSED') {
         this.logger.error(`[OpenWA] ${method} ${path} - Connection refused to ${this.baseURL}`);
-        this.logger.error(`[OpenWA] Make sure OpenWA service is running and accessible at ${this.baseURL}`);
+        this.logger.error(
+          `[OpenWA] Make sure OpenWA service is running and accessible at ${this.baseURL}`,
+        );
       } else if (axiosError.code === 'ETIMEDOUT' || axiosError.code === 'ECONNABORTED') {
         this.logger.error(`[OpenWA] ${method} ${path} - Timeout after ${duration}ms`);
       } else if (axiosError.response) {
-        this.logger.error(`[OpenWA] ${method} ${path} - HTTP ${axiosError.response.status}: ${JSON.stringify(axiosError.response.data)}`);
+        this.logger.error(
+          `[OpenWA] ${method} ${path} - HTTP ${axiosError.response.status}: ${JSON.stringify(axiosError.response.data)}`,
+        );
       } else {
         this.logger.error(`[OpenWA] ${method} ${path} - Error: ${axiosError.message}`);
       }
-      
+
       throw new HttpException(
         `OpenWA request failed: ${axiosError.message}`,
-        HttpStatus.BAD_GATEWAY
+        HttpStatus.BAD_GATEWAY,
       );
     }
   }
@@ -198,10 +206,14 @@ export class OpenWAService {
     templateData?: Record<string, string>,
   ): Promise<OpenWASendMessageResult> {
     this.logger.log(`[OpenWA] Sending template ${templateName} to ${to} via session: ${sessionId}`);
-    return this.request<OpenWASendMessageResult>('POST', `/api/sessions/${sessionId}/send-template`, {
-      to,
-      templateName,
-      templateData,
-    });
+    return this.request<OpenWASendMessageResult>(
+      'POST',
+      `/api/sessions/${sessionId}/send-template`,
+      {
+        to,
+        templateName,
+        templateData,
+      },
+    );
   }
 }
