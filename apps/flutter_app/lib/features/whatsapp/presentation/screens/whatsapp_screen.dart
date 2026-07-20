@@ -124,8 +124,11 @@ class _DisconnectedState extends StatelessWidget {
             child: Stack(
               alignment: Alignment.center,
               children: [
-                const Icon(Icons.qr_code_2,
-                    size: 120, color: AppColors.success,),
+                const Icon(
+                  Icons.qr_code_2,
+                  size: 120,
+                  color: AppColors.success,
+                ),
                 Positioned(
                   bottom: 30,
                   right: 30,

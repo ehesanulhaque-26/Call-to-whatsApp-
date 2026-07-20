@@ -8,9 +8,15 @@ import '../../features/auth/presentation/screens/register_screen.dart';
 import '../../features/auth/presentation/screens/forgot_password_screen.dart';
 import '../../features/automations/presentation/screens/automations_screen.dart';
 import '../../features/settings/presentation/screens/settings_screen.dart';
+import '../../features/admin/presentation/screens/admin_shell.dart';
 import '../../features/admin/presentation/screens/admin_dashboard_screen.dart';
-import '../../features/admin/presentation/screens/users_screen.dart';
-import '../../features/admin/presentation/screens/subscriptions_screen.dart';
+import '../../features/admin/presentation/screens/admin_users_screen.dart';
+import '../../features/admin/presentation/screens/admin_subscriptions_screen.dart';
+import '../../features/admin/presentation/screens/admin_sessions_screen.dart';
+import '../../features/admin/presentation/screens/admin_notifications_screen.dart';
+import '../../features/admin/presentation/screens/admin_logs_screen.dart';
+import '../../features/admin/presentation/screens/admin_settings_screen.dart';
+import '../../features/admin/presentation/screens/admin_profile_screen.dart';
 import '../../features/user/presentation/screens/user_shell.dart';
 import '../../features/user/presentation/screens/user_home_screen.dart';
 import '../../features/user/presentation/screens/user_sessions_screen.dart';
@@ -33,6 +39,11 @@ class AppRoutes {
   static const String admin = '/admin';
   static const String adminUsers = '/admin/users';
   static const String adminSubscriptions = '/admin/subscriptions';
+  static const String adminSessions = '/admin/sessions';
+  static const String adminNotifications = '/admin/notifications';
+  static const String adminLogs = '/admin/logs';
+  static const String adminSettings = '/admin/settings';
+  static const String adminProfile = '/admin/profile';
   static const String sessions = '/sessions';
   static const String contacts = '/contacts';
   static const String notifications = '/notifications';
@@ -61,18 +72,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       }
 
       if (!isLoggedIn && !isAuthRoute) {
-        developer.log(
-          '[Router] Redirect to login - not authenticated',
-          name: 'Router',
-        );
+        developer.log('[Router] Redirect to login - not authenticated',
+            name: 'Router',);
         return AppRoutes.login;
       }
 
       if (isLoggedIn && isAuthRoute) {
-        developer.log(
-          '[Router] Redirect to home - already authenticated',
-          name: 'Router',
-        );
+        developer.log('[Router] Redirect to home - already authenticated',
+            name: 'Router',);
         return AppRoutes.home;
       }
 
@@ -198,17 +205,66 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.admin,
         name: 'admin',
-        builder: (context, state) => const AdminDashboardScreen(),
+        builder: (context, state) => AdminShell(
+          currentPath: state.matchedLocation,
+          child: const AdminDashboardScreen(),
+        ),
       ),
       GoRoute(
         path: AppRoutes.adminUsers,
         name: 'adminUsers',
-        builder: (context, state) => const UsersScreen(),
+        builder: (context, state) => AdminShell(
+          currentPath: state.matchedLocation,
+          child: const AdminUsersScreen(),
+        ),
       ),
       GoRoute(
         path: AppRoutes.adminSubscriptions,
         name: 'adminSubscriptions',
-        builder: (context, state) => const SubscriptionsScreen(),
+        builder: (context, state) => AdminShell(
+          currentPath: state.matchedLocation,
+          child: const AdminSubscriptionsScreen(),
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.adminSessions,
+        name: 'adminSessions',
+        builder: (context, state) => AdminShell(
+          currentPath: state.matchedLocation,
+          child: const AdminSessionsScreen(),
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.adminNotifications,
+        name: 'adminNotifications',
+        builder: (context, state) => AdminShell(
+          currentPath: state.matchedLocation,
+          child: const AdminNotificationsScreen(),
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.adminLogs,
+        name: 'adminLogs',
+        builder: (context, state) => AdminShell(
+          currentPath: state.matchedLocation,
+          child: const AdminLogsScreen(),
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.adminSettings,
+        name: 'adminSettings',
+        builder: (context, state) => AdminShell(
+          currentPath: state.matchedLocation,
+          child: const AdminSettingsScreen(),
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.adminProfile,
+        name: 'adminProfile',
+        builder: (context, state) => AdminShell(
+          currentPath: state.matchedLocation,
+          child: const AdminProfileScreen(),
+        ),
       ),
       GoRoute(
         path: AppRoutes.automations,
@@ -240,10 +296,8 @@ final routerProvider = Provider<GoRouter>((ref) {
           children: [
             const Icon(Icons.error_outline, size: 64, color: Colors.red),
             const SizedBox(height: 16),
-            Text(
-              'Page not found',
-              style: Theme.of(context).textTheme.headlineSmall,
-            ),
+            Text('Page not found',
+                style: Theme.of(context).textTheme.headlineSmall,),
             const SizedBox(height: 8),
             Text(state.error?.message ?? 'Unknown error'),
             const SizedBox(height: 24),

@@ -212,8 +212,10 @@ class SettingsScreen extends ConsumerWidget {
             children: [
               ListTile(
                 leading: const Icon(Icons.logout, color: AppColors.error),
-                title: const Text('Logout',
-                    style: TextStyle(color: AppColors.error),),
+                title: const Text(
+                  'Logout',
+                  style: TextStyle(color: AppColors.error),
+                ),
                 onTap: () {},
               ),
             ],

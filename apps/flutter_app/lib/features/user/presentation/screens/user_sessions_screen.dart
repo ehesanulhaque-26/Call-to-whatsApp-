@@ -44,7 +44,8 @@ class _UserSessionsScreenState extends ConsumerState<UserSessionsScreen> {
         data: (sessions) {
           if (sessions.isEmpty) {
             return _EmptySessions(
-                onCreateSession: () => _showQRBottomSheet(context),);
+              onCreateSession: () => _showQRBottomSheet(context),
+            );
           }
           return RefreshIndicator(
             onRefresh: () async {
@@ -57,8 +58,9 @@ class _UserSessionsScreenState extends ConsumerState<UserSessionsScreen> {
               itemBuilder: (context, index) {
                 final session = sessions[index];
                 return _SessionCard(
-                    session: session,
-                    onTap: () => _showSessionDetails(context, session),);
+                  session: session,
+                  onTap: () => _showSessionDetails(context, session),
+                );
               },
             ),
           );
@@ -113,8 +115,11 @@ class _EmptySessions extends StatelessWidget {
                 color: AppColors.primary.withOpacity(0.1),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.phone_android,
-                  size: 64, color: AppColors.primary,),
+              child: const Icon(
+                Icons.phone_android,
+                size: 64,
+                color: AppColors.primary,
+              ),
             ),
             const SizedBox(height: AppSpacing.lg),
             Text(
@@ -159,7 +164,8 @@ class _SessionCard extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.only(bottom: AppSpacing.md),
       shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppRadius.xl),),
+        borderRadius: BorderRadius.circular(AppRadius.xl),
+      ),
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(AppRadius.xl),
@@ -275,13 +281,19 @@ class _StatusBadge extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-              width: 6,
-              height: 6,
-              decoration: BoxDecoration(color: color, shape: BoxShape.circle),),
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          ),
           const SizedBox(width: 4),
-          Text(label,
-              style: TextStyle(
-                  color: color, fontSize: 12, fontWeight: FontWeight.w500,),),
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
         ],
       ),
     );
@@ -500,10 +512,14 @@ class _QRConnectionSheetState extends ConsumerState<_QRConnectionSheet> {
         Container(
           padding: const EdgeInsets.all(AppSpacing.lg),
           decoration: BoxDecoration(
-              color: AppColors.success.withOpacity(0.1),
-              shape: BoxShape.circle,),
-          child: const Icon(Icons.check_circle,
-              size: 64, color: AppColors.success,),
+            color: AppColors.success.withOpacity(0.1),
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(
+            Icons.check_circle,
+            size: 64,
+            color: AppColors.success,
+          ),
         ),
         const SizedBox(height: AppSpacing.lg),
         Text(
@@ -610,7 +626,9 @@ class _SessionDetailsSheet extends ConsumerWidget {
           _DetailRow(label: 'Session ID', value: session.id),
           if (session.createdAt != null)
             _DetailRow(
-                label: 'Connected', value: _formatDate(session.createdAt!),),
+              label: 'Connected',
+              value: _formatDate(session.createdAt!),
+            ),
           const SizedBox(height: AppSpacing.xl),
           Row(
             children: [
@@ -652,15 +670,18 @@ class _SessionDetailsSheet extends ConsumerWidget {
                       builder: (context) => AlertDialog(
                         title: const Text('Delete Session'),
                         content: const Text(
-                            'Are you sure you want to delete this session?',),
+                          'Are you sure you want to delete this session?',
+                        ),
                         actions: [
                           TextButton(
-                              onPressed: () => Navigator.pop(context, false),
-                              child: const Text('Cancel'),),
+                            onPressed: () => Navigator.pop(context, false),
+                            child: const Text('Cancel'),
+                          ),
                           TextButton(
                             onPressed: () => Navigator.pop(context, true),
                             style: TextButton.styleFrom(
-                                foregroundColor: AppColors.error,),
+                              foregroundColor: AppColors.error,
+                            ),
                             child: const Text('Delete'),
                           ),
                         ],
@@ -677,14 +698,17 @@ class _SessionDetailsSheet extends ConsumerWidget {
                   },
                   icon:
                       const Icon(Icons.delete_outline, color: AppColors.error),
-                  label: const Text('Delete',
-                      style: TextStyle(color: AppColors.error),),
+                  label: const Text(
+                    'Delete',
+                    style: TextStyle(color: AppColors.error),
+                  ),
                 ),
               ),
             ],
           ),
           SizedBox(
-              height: MediaQuery.of(context).padding.bottom + AppSpacing.md,),
+            height: MediaQuery.of(context).padding.bottom + AppSpacing.md,
+          ),
         ],
       ),
     );
@@ -713,12 +737,16 @@ class _DetailRow extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label,
-              style: AppTypography.bodyMedium
-                  .copyWith(color: AppColors.textSecondary),),
-          Text(value,
-              style: AppTypography.bodyMedium
-                  .copyWith(fontWeight: FontWeight.w500),),
+          Text(
+            label,
+            style: AppTypography.bodyMedium
+                .copyWith(color: AppColors.textSecondary),
+          ),
+          Text(
+            value,
+            style:
+                AppTypography.bodyMedium.copyWith(fontWeight: FontWeight.w500),
+          ),
         ],
       ),
     );
