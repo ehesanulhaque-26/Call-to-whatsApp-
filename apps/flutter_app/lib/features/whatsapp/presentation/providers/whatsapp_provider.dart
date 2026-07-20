@@ -63,7 +63,7 @@ class WhatsAppSession {
   factory WhatsAppSession.fromJson(Map<String, dynamic> json) {
     return WhatsAppSession(
       sessionId: json['sessionId'] ?? json['session_id'] ?? '',
-      status: _parseStatus(json['status'] ?? ''),
+      status: parseStatus(json['status'] ?? ''),
       phone: json['phone'],
       deviceName: json['deviceName'] ?? json['device_name'],
       messageCount: json['messageCount'] ?? json['message_count'] ?? 0,
@@ -74,7 +74,8 @@ class WhatsAppSession {
     );
   }
 
-  static WhatsAppStatus _parseStatus(String status) {
+  /// Parse status string to WhatsAppStatus enum
+  static WhatsAppStatus parseStatus(String status) {
     switch (status.toLowerCase()) {
       case 'created':
         return WhatsAppStatus.disconnected;
@@ -508,7 +509,7 @@ class WhatsAppNotifier extends StateNotifier<WhatsAppState> {
         final qr = statusData['qr'] as String?;
         final phone = statusData['phone'] as String?;
         
-        final status = WhatsAppNotifier._parseStatus(sessionState);
+        final status = WhatsAppSession.parseStatus(sessionState);
         _updateSessionStatus(sessionId, status, qrCode: qr, phone: phone);
       }
     } catch (e) {
