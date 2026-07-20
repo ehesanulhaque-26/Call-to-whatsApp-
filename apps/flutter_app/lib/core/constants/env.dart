@@ -4,8 +4,16 @@ class Env {
   Env._();
 
   /// API Base URL - Read from environment variable
+  /// Points to the SaaS backend REST API (must include /api/v1 prefix)
   static const String apiBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
+    defaultValue: '',
+  );
+
+  /// WebSocket URL - Read from environment variable
+  /// Points to the SaaS backend WebSocket endpoint (namespace: /openwa)
+  static const String wsUrl = String.fromEnvironment(
+    'WS_URL',
     defaultValue: '',
   );
 
