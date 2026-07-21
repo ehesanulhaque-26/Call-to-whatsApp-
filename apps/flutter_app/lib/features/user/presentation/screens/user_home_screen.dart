@@ -99,11 +99,11 @@ class UserHomeScreen extends ConsumerWidget {
                   ),
                   const SizedBox(height: AppSpacing.md),
                   _QuickActionCard(
-                    icon: Icons.qr_code_scanner,
+                    icon: Icons.phone_android,
                     title: 'Connect WhatsApp',
-                    subtitle: 'Scan QR code to link your account',
+                    subtitle: 'Link with phone number or QR code',
                     color: AppColors.primary,
-                    onTap: () => context.go(AppRoutes.sessions),
+                    onTap: () => context.push(AppRoutes.connectWhatsApp),
                   ),
                   const SizedBox(height: AppSpacing.md),
                   _QuickActionCard(

@@ -24,6 +24,7 @@ import '../../features/user/presentation/screens/user_contacts_screen.dart';
 import '../../features/user/presentation/screens/user_notifications_screen.dart';
 import '../../features/user/presentation/screens/user_profile_screen.dart';
 import '../../features/user/presentation/screens/user_subscription_screen.dart';
+import '../../features/whatsapp/presentation/screens/whatsapp_connect_screen.dart';
 import '../services/supabase_service.dart';
 
 class AppRoutes {
@@ -49,6 +50,7 @@ class AppRoutes {
   static const String notifications = '/notifications';
   static const String profile = '/profile';
   static const String subscription = '/subscription';
+  static const String connectWhatsApp = '/connect-whatsapp';
 }
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -285,6 +287,26 @@ final routerProvider = Provider<GoRouter>((ref) {
           child: const SettingsScreen(),
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
             return FadeTransition(opacity: animation, child: child);
+          },
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.connectWhatsApp,
+        name: 'connectWhatsApp',
+        pageBuilder: (context, state) => CustomTransitionPage(
+          key: state.pageKey,
+          child: const WhatsAppConnectScreen(),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return SlideTransition(
+              position: Tween<Offset>(
+                begin: const Offset(0, 1),
+                end: Offset.zero,
+              ).animate(CurvedAnimation(
+                parent: animation,
+                curve: Curves.easeOutCubic,
+              )),
+              child: child,
+            );
           },
         ),
       ),

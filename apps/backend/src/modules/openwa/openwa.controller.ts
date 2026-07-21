@@ -9,10 +9,25 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiParam,
+  ApiBody,
+  ApiBadRequestResponse,
+  ApiNotFoundResponse,
+  ApiConflictResponse,
+  ApiRequestTimeoutResponse,
+  ApiForbiddenResponse,
+  ApiServiceUnavailableResponse,
+  ApiInternalServerErrorResponse,
+} from '@nestjs/swagger';
 import { OpenWAService } from './openwa.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
+import { RequestPairingCodeDto } from './dto';
 
 @ApiTags('openwa')
 @ApiBearerAuth()
@@ -303,6 +318,141 @@ export class OpenWAController {
   @ApiResponse({ status: 200, description: 'Logout successful' })
   async logoutSession(@Param('sessionId') sessionId: string) {
     return this.openWAService.logoutSession(sessionId);
+  }
+
+  @Post('sessions/:sessionId/pairing-code')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Request pairing code for phone number authentication',
+    description:
+      'Request a pairing code to link your WhatsApp account via phone number instead of scanning a QR code. ' +
+      'The phone number must be in international format (e.g., +919876543210). ' +
+      'Enter the pairing code on your WhatsApp app when prompted.',
+  })
+  @ApiParam({ name: 'sessionId', description: 'Session ID (UUID)' })
+  @ApiBody({ type: RequestPairingCodeDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Pairing code generated successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        pairingCode: {
+          type: 'string',
+          example: 'ABCD-EFGH',
+          description: 'The pairing code to enter on WhatsApp',
+        },
+        status: {
+          type: 'string',
+          example: 'PAIRING',
+          description: 'Current pairing status',
+        },
+      },
+    },
+  })
+  @ApiBadRequestResponse({
+    description: 'Invalid phone number format or missing required fields',
+    schema: {
+      type: 'object',
+      properties: {
+        statusCode: { type: 'number', example: 400 },
+        message: {
+          type: 'array',
+          items: { type: 'string' },
+          example: ['phone number must be in international format (e.g., +919876543210)'],
+        },
+        error: { type: 'string', example: 'Bad Request' },
+      },
+    },
+  })
+  @ApiNotFoundResponse({
+    description: 'Session not found',
+    schema: {
+      type: 'object',
+      properties: {
+        statusCode: { type: 'number', example: 404 },
+        message: { type: 'string', example: 'Session not found' },
+        error: { type: 'string', example: 'Not Found' },
+      },
+    },
+  })
+  @ApiConflictResponse({
+    description: 'Session is already connected',
+    schema: {
+      type: 'object',
+      properties: {
+        statusCode: { type: 'number', example: 409 },
+        message: {
+          type: 'string',
+          example: 'Session is already connected. Please disconnect first.',
+        },
+        error: { type: 'string', example: 'Conflict' },
+      },
+    },
+  })
+  @ApiRequestTimeoutResponse({
+    description: 'Pairing request timed out',
+    schema: {
+      type: 'object',
+      properties: {
+        statusCode: { type: 'number', example: 408 },
+        message: { type: 'string', example: 'Pairing request timed out. Please try again.' },
+        error: { type: 'string', example: 'Request Timeout' },
+      },
+    },
+  })
+  @ApiForbiddenResponse({
+    description: 'Pairing request rejected by WhatsApp',
+    schema: {
+      type: 'object',
+      properties: {
+        statusCode: { type: 'number', example: 403 },
+        message: {
+          type: 'string',
+          example: 'Pairing request was rejected. Please try again later.',
+        },
+        error: { type: 'string', example: 'Forbidden' },
+      },
+    },
+  })
+  @ApiServiceUnavailableResponse({
+    description: 'OpenWA server unavailable',
+    schema: {
+      type: 'object',
+      properties: {
+        statusCode: { type: 'number', example: 503 },
+        message: { type: 'string', example: 'OpenWA server is unavailable' },
+        error: { type: 'string', example: 'Service Unavailable' },
+      },
+    },
+  })
+  @ApiInternalServerErrorResponse({
+    description: 'Internal server error',
+    schema: {
+      type: 'object',
+      properties: {
+        statusCode: { type: 'number', example: 500 },
+        message: { type: 'string', example: 'Failed to request pairing code' },
+        error: { type: 'string', example: 'Internal Server Error' },
+      },
+    },
+  })
+  async requestPairingCode(
+    @Param('sessionId') sessionId: string,
+    @Body() body: RequestPairingCodeDto,
+  ) {
+    console.log(
+      `[OpenWA Controller] PAIRING CODE REQUEST - Received request for session: ${sessionId}`,
+    );
+    console.log(`[OpenWA Controller] PAIRING CODE REQUEST - Phone number: ${body.phoneNumber}`);
+
+    const result = await this.openWAService.requestPairingCode(sessionId, body.phoneNumber);
+
+    console.log(
+      `[OpenWA Controller] PAIRING CODE REQUEST - Returning pairing code: ${result.pairingCode}`,
+    );
+
+    return result;
   }
 
   @Delete('sessions/:sessionId')

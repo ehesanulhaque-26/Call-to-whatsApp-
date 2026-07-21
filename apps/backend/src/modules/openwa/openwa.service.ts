@@ -83,6 +83,18 @@ export interface OpenWAQRCodeResponse {
   status: SessionStatus;
 }
 
+// Pairing code response from OpenWA
+export interface OpenWAPairingCodeResponse {
+  pairingCode: string;
+  status: string;
+}
+
+// Flutter pairing code response (clean contract for Flutter)
+export interface FlutterPairingCodeResponse {
+  pairingCode: string;
+  status: string;
+}
+
 // Flutter session status response
 // Maps OpenWA session states to Flutter contract format
 export interface FlutterSessionStatusResponse {
@@ -459,6 +471,140 @@ export class OpenWAService {
   // Response: { qrCode: string, status: SessionStatus }
   async getQRCode(sessionId: string): Promise<OpenWAQRCodeResponse> {
     return this.request<OpenWAQRCodeResponse>('GET', `/api/sessions/${sessionId}/qr`);
+  }
+
+  // =====================================================
+  // PHONE NUMBER PAIRING
+  // =====================================================
+
+  /**
+   * Request a pairing code for phone number authentication
+   * This allows users to link their WhatsApp account via phone number instead of QR code
+   *
+   * OpenWA: POST /api/sessions/:id/pairing-code
+   * Body: { phoneNumber: string }
+   * Response: { pairingCode: string, status: string }
+   *
+   * @param sessionId - The session ID
+   * @param phoneNumber - Phone number in international format (e.g., +919876543210)
+   * @returns Pairing code response with code and status
+   */
+  async requestPairingCode(
+    sessionId: string,
+    phoneNumber: string,
+  ): Promise<FlutterPairingCodeResponse> {
+    this.logger.warn(
+      `[OpenWA Service] PAIRING REQUEST - Phone number pairing requested for session: ${sessionId}`,
+    );
+    this.logger.warn(`[OpenWA Service] PAIRING REQUEST - Phone validated: ${phoneNumber}`);
+
+    // Validate phone number format (basic validation)
+    const cleanedPhone = phoneNumber.replace(/[\s\-()]/g, '');
+    if (!cleanedPhone.match(/^\+?\d{10,15}$/)) {
+      this.logger.error(
+        `[OpenWA Service] PAIRING REQUEST - Invalid phone number format: ${phoneNumber}`,
+      );
+      throw new HttpException('Invalid phone number format', HttpStatus.BAD_REQUEST);
+    }
+
+    // Normalize phone number to ensure it starts with +
+    const normalizedPhone = cleanedPhone.startsWith('+') ? cleanedPhone : `+${cleanedPhone}`;
+
+    this.logger.warn(
+      `[OpenWA Service] PAIRING REQUEST - Calling OpenWA pairing endpoint for phone: ${normalizedPhone}`,
+    );
+
+    try {
+      // Call OpenWA pairing endpoint
+      const response = await this.request<OpenWAPairingCodeResponse>(
+        'POST',
+        `/api/sessions/${sessionId}/pairing-code`,
+        { phoneNumber: normalizedPhone },
+      );
+
+      this.logger.warn(
+        `[OpenWA Service] PAIRING REQUEST - Pairing code received: ${response.pairingCode}`,
+      );
+      this.logger.warn(`[OpenWA Service] PAIRING REQUEST - Status: ${response.status}`);
+
+      // Return clean Flutter contract
+      return {
+        pairingCode: response.pairingCode,
+        status: response.status,
+      };
+    } catch (error) {
+      const axiosError = error as AxiosError;
+      const response = axiosError.response;
+
+      // Handle specific error cases from OpenWA
+      if (response?.status) {
+        switch (response.status) {
+          case 400:
+            this.logger.error(
+              `[OpenWA Service] PAIRING REQUEST - Bad request (invalid phone or session)`,
+            );
+            throw new HttpException(
+              'Invalid phone number or session state',
+              HttpStatus.BAD_REQUEST,
+            );
+          case 404:
+            this.logger.error(`[OpenWA Service] PAIRING REQUEST - Session not found: ${sessionId}`);
+            throw new HttpException('Session not found', HttpStatus.NOT_FOUND);
+          case 409:
+            this.logger.error(
+              `[OpenWA Service] PAIRING REQUEST - Session already connected: ${sessionId}`,
+            );
+            throw new HttpException(
+              'Session is already connected. Please disconnect first.',
+              HttpStatus.CONFLICT,
+            );
+          case 408:
+            this.logger.error(
+              `[OpenWA Service] PAIRING REQUEST - Pairing request timeout: ${sessionId}`,
+            );
+            throw new HttpException(
+              'Pairing request timed out. Please try again.',
+              HttpStatus.REQUEST_TIMEOUT,
+            );
+          case 403:
+            this.logger.error(
+              `[OpenWA Service] PAIRING REQUEST - Pairing rejected by WhatsApp: ${sessionId}`,
+            );
+            throw new HttpException(
+              'Pairing request was rejected. Please try again later.',
+              HttpStatus.FORBIDDEN,
+            );
+          default:
+            this.logger.error(
+              `[OpenWA Service] PAIRING REQUEST - OpenWA error: ${response.status} - ${JSON.stringify(response.data)}`,
+            );
+        }
+      }
+
+      // If it's a timeout error
+      if (axiosError.code === 'ECONNABORTED' || axiosError.code === 'ETIMEDOUT') {
+        this.logger.error(`[OpenWA Service] PAIRING REQUEST - Request timeout`);
+        throw new HttpException(
+          'OpenWA request timed out. Please try again.',
+          HttpStatus.GATEWAY_TIMEOUT,
+        );
+      }
+
+      // If it's a connection error
+      if (axiosError.code === 'ECONNREFUSED' || !axiosError.response) {
+        this.logger.error(`[OpenWA Service] PAIRING REQUEST - OpenWA server unavailable`);
+        throw new HttpException('OpenWA server is unavailable', HttpStatus.SERVICE_UNAVAILABLE);
+      }
+
+      // Re-throw HttpExceptions as-is
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      // Generic error
+      this.logger.error(`[OpenWA Service] PAIRING REQUEST - Unexpected error: ${error}`);
+      throw new HttpException('Failed to request pairing code', HttpStatus.INTERNAL_SERVER_ERROR);
+    }
   }
 
   // =====================================================
