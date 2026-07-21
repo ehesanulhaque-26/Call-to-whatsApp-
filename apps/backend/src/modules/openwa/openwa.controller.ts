@@ -55,25 +55,21 @@ export class OpenWAController {
       JSON.stringify(createResult),
     );
 
-    // Step 2: Start the session (this triggers QR generation)
+    // Step 2: Start the session (fire-and-forget to avoid 60s timeout)
+    // This triggers QR generation in OpenWA while we poll separately
     const sessionId = createResult.id || finalName;
-    console.log(`[OpenWA Controller] CREATE SESSION - Step 2: Starting session ${sessionId}...`);
+    console.log(
+      `[OpenWA Controller] CREATE SESSION - Step 2: Initiating session start (no-wait)...`,
+    );
     console.log(
       `[OpenWA Controller] CREATE SESSION - Step 2: POST /api/sessions/${sessionId}/start`,
     );
 
-    try {
-      const startResult = await this.openWAService.startSession(sessionId);
-      console.log(
-        `[OpenWA Controller] CREATE SESSION - Step 2: Start result:`,
-        JSON.stringify(startResult),
-      );
-    } catch (error) {
-      console.log(
-        `[OpenWA Controller] CREATE SESSION - Step 2: Start error (continuing anyway):`,
-        error,
-      );
-    }
+    // Use fire-and-forget to avoid blocking on OpenWA's slow /start endpoint
+    await this.openWAService.startSessionNoWait(sessionId);
+    console.log(
+      `[OpenWA Controller] CREATE SESSION - Step 2: Session start initiated (not waiting)`,
+    );
 
     // Step 3: Poll for QR code
     console.log(`[OpenWA Controller] CREATE SESSION - Step 3: Polling for QR code...`);

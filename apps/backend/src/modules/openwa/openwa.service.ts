@@ -3,6 +3,15 @@ import { ConfigService } from '@nestjs/config';
 import axios, { AxiosInstance, AxiosError } from 'axios';
 
 /**
+ * Separate axios instance for fire-and-forget requests
+ * Uses a short timeout so we don't block the main thread
+ */
+const noWaitClient = axios.create({
+  timeout: 5000, // 5 second timeout for fire-and-forget requests
+  headers: { 'Content-Type': 'application/json' },
+});
+
+/**
  * OpenWA API Response Types (matching actual OpenWA server implementation)
  */
 
@@ -277,6 +286,55 @@ export class OpenWAService {
     const result = await this.request<OpenWASession>('POST', `/api/sessions/${sessionId}/start`);
     this.logger.warn(`[OpenWA Service] START SESSION - Response: ${JSON.stringify(result)}`);
     return result;
+  }
+
+  /**
+   * Start session without waiting for response (fire-and-forget)
+   * Uses a short timeout to avoid blocking the main thread
+   * The OpenWA server will continue processing in the background
+   * while we poll for the QR code separately
+   */
+  async startSessionNoWait(sessionId: string): Promise<void> {
+    const startTime = Date.now();
+    this.logger.warn(
+      `[OpenWA Service] START NO-WAIT - Initiating POST /api/sessions/${sessionId}/start`,
+    );
+    this.logger.warn(
+      `[OpenWA Service] START NO-WAIT - Request sent at: ${new Date().toISOString()}`,
+    );
+
+    try {
+      // Fire and forget - don't await the response
+      noWaitClient
+        .post(
+          `${this.baseURL}/api/sessions/${sessionId}/start`,
+          {},
+          {
+            headers: this.apiKey ? { 'X-API-Key': this.apiKey } : {},
+          },
+        )
+        .then((response) => {
+          const elapsed = Date.now() - startTime;
+          this.logger.warn(
+            `[OpenWA Service] START NO-WAIT - Response received after ${elapsed}ms: ${response.status}`,
+          );
+        })
+        .catch((error) => {
+          const elapsed = Date.now() - startTime;
+          const status = error.response?.status;
+          this.logger.warn(
+            `[OpenWA Service] START NO-WAIT - Request completed (or timed out) after ${elapsed}ms, status: ${status || 'timeout/error'}`,
+          );
+          // Don't throw - we want to continue polling for QR regardless
+        });
+
+      this.logger.warn(
+        `[OpenWA Service] START NO-WAIT - Request initiated, not waiting for response`,
+      );
+    } catch (error) {
+      this.logger.warn(`[OpenWA Service] START NO-WAIT - Error initiating request: ${error}`);
+      // Don't throw - continue with polling
+    }
   }
 
   // Stop a session (logout)
