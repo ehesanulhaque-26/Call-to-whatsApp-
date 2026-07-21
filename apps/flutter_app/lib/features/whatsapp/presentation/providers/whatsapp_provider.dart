@@ -925,7 +925,7 @@ class WhatsAppNotifier extends StateNotifier<WhatsAppState> {
 
   /// Request a pairing code from the backend
   Future<String?> _requestPairingCode(String sessionId, String phoneNumber) async {
-    developer.log('[WhatsAppProvider] Requesting pairing code...', name: 'PhonePairing');
+    developer.log('[WhatsAppProvider] Requesting pairing code for session: $sessionId, phone: $phoneNumber', name: 'PhonePairing');
 
     try {
       final response = await _apiClient.post<Map<String, dynamic>>(
@@ -933,11 +933,14 @@ class WhatsAppNotifier extends StateNotifier<WhatsAppState> {
         data: {'phoneNumber': phoneNumber},
       );
 
+      developer.log('[WhatsAppProvider] Pairing code response status: ${response.statusCode}', name: 'PhonePairing');
+      developer.log('[WhatsAppProvider] Pairing code response data: ${response.data}', name: 'PhonePairing');
+
       if (response.data != null) {
         final pairingCode = response.data!['pairingCode'] as String?;
         final status = response.data!['status'] as String?;
         
-        developer.log('[WhatsAppProvider] Pairing code response: $pairingCode, status: $status', name: 'PhonePairing');
+        developer.log('[WhatsAppProvider] Pairing code: $pairingCode, status: $status', name: 'PhonePairing');
         
         if (pairingCode != null) {
           state = state.copyWith(
@@ -948,37 +951,50 @@ class WhatsAppNotifier extends StateNotifier<WhatsAppState> {
         }
       }
 
+      developer.log('[WhatsAppProvider] No pairing code in response', name: 'PhonePairing');
       state = state.copyWith(
         phonePairingStatus: PhonePairingStatus.failed,
         pairingError: 'Failed to get pairing code',
       );
       return null;
     } on DioException catch (e) {
-      developer.log('[WhatsAppProvider] Dio error requesting pairing code: ${e.message}', name: 'PhonePairing');
+      developer.log('[WhatsAppProvider] Dio error: ${e.type}, message: ${e.message}', name: 'PhonePairing');
+      developer.log('[WhatsAppProvider] Response: ${e.response?.data}', name: 'PhonePairing');
       
       String errorMessage = 'Failed to request pairing code';
+      final statusCode = e.response?.statusCode;
       
-      if (e.response?.statusCode == 400) {
+      if (statusCode == 400) {
         errorMessage = 'Invalid phone number format';
-      } else if (e.response?.statusCode == 404) {
+      } else if (statusCode == 404) {
         errorMessage = 'Session not found';
-      } else if (e.response?.statusCode == 409) {
+      } else if (statusCode == 409) {
         errorMessage = 'Session already connected';
-      } else if (e.response?.statusCode == 408) {
+      } else if (statusCode == 408) {
         errorMessage = 'Pairing request timed out';
-      } else if (e.response?.statusCode == 403) {
+      } else if (statusCode == 403) {
         errorMessage = 'Pairing rejected by WhatsApp';
-      } else if (e.response?.statusCode == 503) {
+      } else if (statusCode == 503) {
         errorMessage = 'OpenWA server unavailable';
+      } else if (e.type == DioExceptionType.connectionTimeout) {
+        errorMessage = 'Connection timeout. Please check your internet.';
+      } else if (e.type == DioExceptionType.receiveTimeout) {
+        errorMessage = 'Server response timeout. Please try again.';
+      } else if (e.type == DioExceptionType.connectionError) {
+        errorMessage = 'Connection error. Please check your internet.';
+      } else {
+        errorMessage = e.message ?? 'Unknown error occurred';
       }
 
+      developer.log('[WhatsAppProvider] Error message: $errorMessage', name: 'PhonePairing');
       state = state.copyWith(
         phonePairingStatus: PhonePairingStatus.failed,
         pairingError: errorMessage,
       );
       return null;
-    } catch (e) {
-      developer.log('[WhatsAppProvider] Error requesting pairing code: $e', name: 'PhonePairing');
+    } catch (e, stackTrace) {
+      developer.log('[WhatsAppProvider] Unexpected error: $e', name: 'PhonePairing');
+      developer.log('[WhatsAppProvider] Stack trace: $stackTrace', name: 'PhonePairing');
       state = state.copyWith(
         phonePairingStatus: PhonePairingStatus.failed,
         pairingError: e.toString(),

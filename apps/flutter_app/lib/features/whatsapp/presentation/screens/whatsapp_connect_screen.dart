@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../../core/router/app_router.dart';
 import '../../../../core/theme/app_tokens.dart';
 import '../providers/whatsapp_provider.dart';
 
@@ -86,8 +87,9 @@ class _WhatsAppConnectScreenState extends ConsumerState<WhatsAppConnectScreen>
   }
 
   void _onConnectWithQR() {
-    // Navigate to the existing WhatsApp screen with QR
-    context.pop();
+    // Navigate to Sessions screen where QR flow is available
+    // The Sessions screen has the _QRConnectionSheet with QR code generation
+    context.go(AppRoutes.sessions);
   }
 
   void _onCancelPairing() {

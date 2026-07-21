@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import '../../../../core/router/app_router.dart';
 import '../../../../core/theme/app_tokens.dart';
 import '../../../whatsapp/data/repositories/whatsapp_repository.dart';
 import '../../../whatsapp/presentation/providers/whatsapp_provider.dart';
@@ -44,7 +46,7 @@ class _UserSessionsScreenState extends ConsumerState<UserSessionsScreen> {
         data: (sessions) {
           if (sessions.isEmpty) {
             return _EmptySessions(
-              onCreateSession: () => _showQRBottomSheet(context),
+              onConnectPhone: () => _showConnectionOptions(context),
             );
           }
           return RefreshIndicator(
@@ -69,7 +71,7 @@ class _UserSessionsScreenState extends ConsumerState<UserSessionsScreen> {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
           HapticFeedback.mediumImpact();
-          _showQRBottomSheet(context);
+          _showConnectionOptions(context);
         },
         icon: const Icon(Icons.add),
         label: const Text('Connect'),
@@ -77,6 +79,17 @@ class _UserSessionsScreenState extends ConsumerState<UserSessionsScreen> {
     );
   }
 
+  /// Show connection options bottom sheet with Phone and QR options
+  void _showConnectionOptions(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => const _ConnectionOptionsSheet(),
+    );
+  }
+
+  /// Show QR connection sheet directly
   void _showQRBottomSheet(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -97,9 +110,9 @@ class _UserSessionsScreenState extends ConsumerState<UserSessionsScreen> {
 }
 
 class _EmptySessions extends StatelessWidget {
-  const _EmptySessions({required this.onCreateSession});
+  const _EmptySessions({required this.onConnectPhone});
 
-  final VoidCallback onCreateSession;
+  final VoidCallback onConnectPhone;
 
   @override
   Widget build(BuildContext context) {
@@ -140,11 +153,166 @@ class _EmptySessions extends StatelessWidget {
             ),
             const SizedBox(height: AppSpacing.xl),
             FilledButton.icon(
-              onPressed: onCreateSession,
-              icon: const Icon(Icons.qr_code_scanner),
+              onPressed: onConnectPhone,
+              icon: const Icon(Icons.phone_android),
               label: const Text('Connect WhatsApp'),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Bottom sheet with connection options: Phone Number or QR Code
+class _ConnectionOptionsSheet extends StatelessWidget {
+  const _ConnectionOptionsSheet();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.xxl)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Handle
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: AppColors.textTertiary,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          Text(
+            'Connect WhatsApp',
+            style: Theme.of(context)
+                .textTheme
+                .titleLarge
+                ?.copyWith(fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            'Choose how you want to connect',
+            style: Theme.of(context)
+                .textTheme
+                .bodyMedium
+                ?.copyWith(color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: AppSpacing.xl),
+          
+          // Phone Number Option
+          _ConnectionOptionCard(
+            icon: Icons.phone_android,
+            title: 'Phone Number',
+            subtitle: 'Connect using your phone number',
+            color: AppColors.primary,
+            onTap: () {
+              Navigator.pop(context);
+              context.push(AppRoutes.connectWhatsApp);
+            },
+          ),
+          const SizedBox(height: AppSpacing.md),
+          
+          // QR Code Option
+          _ConnectionOptionCard(
+            icon: Icons.qr_code_scanner,
+            title: 'QR Code',
+            subtitle: 'Scan QR code with WhatsApp',
+            color: AppColors.info,
+            onTap: () {
+              Navigator.pop(context);
+              // Close bottom sheet and trigger QR flow
+              // The QR flow will be shown after the bottom sheet closes
+              _showQRFlow(context);
+            },
+          ),
+          SizedBox(
+            height: MediaQuery.of(context).padding.bottom + AppSpacing.md,
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showQRFlow(BuildContext context) {
+    // Navigate to a screen or show a sheet that starts QR connection
+    // For now, we'll show the QR connection sheet
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => const _QRConnectionSheet(),
+    );
+  }
+}
+
+/// Individual connection option card
+class _ConnectionOptionCard extends StatelessWidget {
+  const _ConnectionOptionCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.color,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Color color;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadius.xl),
+        side: BorderSide(color: color.withOpacity(0.3)),
+      ),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppRadius.xl),
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(AppSpacing.md),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(AppRadius.lg),
+                ),
+                child: Icon(icon, color: color, size: 28),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: AppTypography.titleSmall
+                          .copyWith(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: AppTypography.bodySmall
+                          .copyWith(color: AppColors.textSecondary),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right, color: color),
+            ],
+          ),
         ),
       ),
     );
