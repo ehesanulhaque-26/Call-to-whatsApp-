@@ -276,6 +276,66 @@ export class OpenWAService {
     return this.request<OpenWASession>('GET', `/api/sessions/${sessionId}`);
   }
 
+  /**
+   * Get all sessions from OpenWA server
+   * Useful for debugging stuck sessions
+   */
+  async getAllSessions(): Promise<OpenWASession[]> {
+    this.logger.warn(`[OpenWA Service] GET ALL SESSIONS - Fetching all sessions`);
+    try {
+      const sessions = await this.request<OpenWASession[]>('GET', '/api/sessions');
+      this.logger.warn(
+        `[OpenWA Service] GET ALL SESSIONS - Found ${sessions?.length || 0} sessions`,
+      );
+      if (sessions) {
+        for (const session of sessions) {
+          this.logger.warn(
+            `[OpenWA Service]   - Session: ${session.id}, status: ${session.status}`,
+          );
+        }
+      }
+      return sessions || [];
+    } catch (error) {
+      this.logger.error(`[OpenWA Service] GET ALL SESSIONS - Error: ${error}`);
+      return [];
+    }
+  }
+
+  /**
+   * Delete a session from OpenWA server
+   * Useful for cleaning up stuck sessions before creating new ones
+   */
+  async deleteSessionFromServer(sessionId: string): Promise<boolean> {
+    this.logger.warn(`[OpenWA Service] DELETE SESSION - Deleting session ${sessionId}`);
+    try {
+      await this.request('DELETE', `/api/sessions/${sessionId}`);
+      this.logger.warn(`[OpenWA Service] DELETE SESSION - Session ${sessionId} deleted`);
+      return true;
+    } catch (error) {
+      this.logger.warn(
+        `[OpenWA Service] DELETE SESSION - Could not delete session ${sessionId}: ${error}`,
+      );
+      return false;
+    }
+  }
+
+  /**
+   * Cleanup all existing sessions before creating new ones
+   * This helps prevent issues with stuck sessions
+   */
+  async cleanupAllSessions(): Promise<void> {
+    this.logger.warn(`[OpenWA Service] CLEANUP - Starting cleanup of all sessions`);
+    const sessions = await this.getAllSessions();
+    if (sessions.length === 0) {
+      this.logger.warn(`[OpenWA Service] CLEANUP - No sessions to clean up`);
+      return;
+    }
+    for (const session of sessions) {
+      await this.deleteSessionFromServer(session.id);
+    }
+    this.logger.warn(`[OpenWA Service] CLEANUP - Finished cleaning up ${sessions.length} sessions`);
+  }
+
   // Start a session (generates QR code)
   // OpenWA: POST /api/sessions/:id/start
   // Response: Session object with status

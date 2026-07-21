@@ -47,6 +47,25 @@ export class OpenWAController {
       console.log(`[OpenWA Controller] CREATE SESSION - Generated name: "${finalName}"`);
     }
 
+    // Step 0: Check for existing sessions and cleanup if needed
+    // This helps if there are stuck sessions blocking new ones
+    console.log(`[OpenWA Controller] CREATE SESSION - Step 0: Checking for existing sessions...`);
+    const existingSessions = await this.openWAService.getAllSessions();
+    console.log(
+      `[OpenWA Controller] CREATE SESSION - Step 0: Found ${existingSessions.length} existing sessions`,
+    );
+
+    if (existingSessions.length > 0) {
+      console.log(`[OpenWA Controller] CREATE SESSION - Step 0: Cleaning up existing sessions...`);
+      for (const session of existingSessions) {
+        console.log(
+          `[OpenWA Controller] CREATE SESSION - Step 0:   Deleting session: ${session.id} (status: ${session.status})`,
+        );
+        await this.openWAService.deleteSessionFromServer(session.id);
+      }
+      console.log(`[OpenWA Controller] CREATE SESSION - Step 0: Cleanup complete`);
+    }
+
     // Step 1: Create the session
     console.log(`[OpenWA Controller] CREATE SESSION - Step 1: Creating session in OpenWA...`);
     const createResult = await this.openWAService.createSession(finalName, body.config);
