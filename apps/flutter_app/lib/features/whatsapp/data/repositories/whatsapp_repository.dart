@@ -67,12 +67,22 @@ class WhatsAppRepository {
   }
 
   /// Create a new WhatsApp session
-  Future<OpenWASession> createSession() async {
-    final response = await _apiClient.post('/openwa/sessions');
+  /// [sessionName] - Optional name for the session. If not provided, a default name will be generated.
+  Future<OpenWASession> createSession({String? sessionName}) async {
+    // Generate a name if not provided
+    final name = sessionName ?? 'session-${DateTime.now().millisecondsSinceEpoch}';
+    
+    print('[WhatsAppRepository] Creating session with name: $name');
+    final response = await _apiClient.post(
+      '/openwa/sessions',
+      data: {'name': name},  // NOTE: Backend expects 'name', not 'sessionName'
+    );
+    
     if (response.statusCode == 201 || response.statusCode == 200) {
+      print('[WhatsAppRepository] Session created: ${response.data}');
       return OpenWASession.fromJson(response.data);
     }
-    throw Exception('Failed to create session');
+    throw Exception('Failed to create session: ${response.statusCode}');
   }
 
   /// Get session status

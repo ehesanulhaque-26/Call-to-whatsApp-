@@ -417,7 +417,7 @@ class WhatsAppNotifier extends StateNotifier<WhatsAppState> {
       
       final response = await _apiClient.post<Map<String, dynamic>>(
         '/openwa/sessions',
-        data: {'sessionName': name},
+        data: {'name': name ?? 'wa-${DateTime.now().millisecondsSinceEpoch}'},
       );
       
       if (response.data != null) {

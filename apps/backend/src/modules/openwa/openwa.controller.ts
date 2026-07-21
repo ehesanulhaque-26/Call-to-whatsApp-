@@ -34,7 +34,23 @@ export class OpenWAController {
   @ApiOperation({ summary: 'Create a new WhatsApp session' })
   @ApiResponse({ status: 201, description: 'Session created' })
   async createSession(@Body() body: { name: string; config?: Record<string, unknown> }) {
-    return this.openWAService.createSession(body.name, body.config);
+    const sessionName = body?.name;
+
+    // Log the incoming request
+    console.log(`[OpenWA Controller] CREATE SESSION - Received body:`, JSON.stringify(body));
+    console.log(`[OpenWA Controller] CREATE SESSION - Extracted name: "${sessionName}"`);
+
+    // Generate a name if not provided or invalid
+    let finalName = sessionName;
+    if (!finalName || finalName === 'undefined' || finalName === 'null') {
+      finalName = `wa-${Date.now()}`;
+      console.log(`[OpenWA Controller] CREATE SESSION - Generated name: "${finalName}"`);
+    }
+
+    const result = await this.openWAService.createSession(finalName, body.config);
+    console.log(`[OpenWA Controller] CREATE SESSION - Result:`, JSON.stringify(result));
+
+    return result;
   }
 
   @Get('sessions')
