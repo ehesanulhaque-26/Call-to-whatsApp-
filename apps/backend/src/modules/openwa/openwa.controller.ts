@@ -31,13 +31,13 @@ export class OpenWAController {
   // Session endpoints
   @Post('sessions')
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Create a new WhatsApp session' })
-  @ApiResponse({ status: 201, description: 'Session created' })
+  @ApiOperation({ summary: 'Create a new WhatsApp session and start it to get QR code' })
+  @ApiResponse({ status: 201, description: 'Session created and started' })
   async createSession(@Body() body: { name: string; config?: Record<string, unknown> }) {
-    const sessionName = body?.name;
-
-    // Log the incoming request
+    console.log(`[OpenWA Controller] ========== ENTERED OpenWAController.createSession ==========`);
     console.log(`[OpenWA Controller] CREATE SESSION - Received body:`, JSON.stringify(body));
+
+    const sessionName = body?.name;
     console.log(`[OpenWA Controller] CREATE SESSION - Extracted name: "${sessionName}"`);
 
     // Generate a name if not provided or invalid
@@ -47,10 +47,106 @@ export class OpenWAController {
       console.log(`[OpenWA Controller] CREATE SESSION - Generated name: "${finalName}"`);
     }
 
-    const result = await this.openWAService.createSession(finalName, body.config);
-    console.log(`[OpenWA Controller] CREATE SESSION - Result:`, JSON.stringify(result));
+    // Step 1: Create the session
+    console.log(`[OpenWA Controller] CREATE SESSION - Step 1: Creating session in OpenWA...`);
+    const createResult = await this.openWAService.createSession(finalName, body.config);
+    console.log(
+      `[OpenWA Controller] CREATE SESSION - Step 1: Session created:`,
+      JSON.stringify(createResult),
+    );
 
-    return result;
+    // Step 2: Start the session (this triggers QR generation)
+    const sessionId = createResult.id || finalName;
+    console.log(`[OpenWA Controller] CREATE SESSION - Step 2: Starting session ${sessionId}...`);
+    console.log(
+      `[OpenWA Controller] CREATE SESSION - Step 2: POST /api/sessions/${sessionId}/start`,
+    );
+
+    try {
+      const startResult = await this.openWAService.startSession(sessionId);
+      console.log(
+        `[OpenWA Controller] CREATE SESSION - Step 2: Start result:`,
+        JSON.stringify(startResult),
+      );
+    } catch (error) {
+      console.log(
+        `[OpenWA Controller] CREATE SESSION - Step 2: Start error (continuing anyway):`,
+        error,
+      );
+    }
+
+    // Step 3: Poll for QR code
+    console.log(`[OpenWA Controller] CREATE SESSION - Step 3: Polling for QR code...`);
+    const qrCode = await this.pollForQRCode(sessionId);
+
+    console.log(
+      `[OpenWA Controller] CREATE SESSION - Step 3: QR code received: ${qrCode ? 'YES (length: ' + qrCode.length + ')' : 'NO'}`,
+    );
+    console.log(`[OpenWA Controller] ========== EXITING OpenWAController.createSession ==========`);
+
+    return {
+      ...createResult,
+      qr: qrCode,
+      status: qrCode ? 'qr_generated' : createResult.status,
+    };
+  }
+
+  /**
+   * Poll for QR code until it's ready or timeout
+   */
+  private async pollForQRCode(
+    sessionId: string,
+    maxAttempts = 30,
+    intervalMs = 2000,
+  ): Promise<string | null> {
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      console.log(
+        `[OpenWA Controller] POLL QR - Attempt ${attempt}/${maxAttempts}: GET /api/sessions/${sessionId}/qr`,
+      );
+
+      try {
+        const qrResponse = await this.openWAService.getQRCode(sessionId);
+        console.log(
+          `[OpenWA Controller] POLL QR - Attempt ${attempt}: Response:`,
+          JSON.stringify(qrResponse),
+        );
+
+        // OpenWA returns qrCode field (not qr)
+        const qrCode = qrResponse?.qrCode;
+        if (qrCode) {
+          console.log(`[OpenWA Controller] POLL QR - QR code received on attempt ${attempt}`);
+          return qrCode;
+        }
+
+        // Check if session is already connected or QR is ready
+        const statusResponse = await this.openWAService.getSession(sessionId);
+        console.log(
+          `[OpenWA Controller] POLL QR - Attempt ${attempt}: Session status:`,
+          JSON.stringify(statusResponse),
+        );
+
+        const status = statusResponse?.status;
+        if (status === 'READY' || status === 'CONNECTING') {
+          console.log(
+            `[OpenWA Controller] POLL QR - Session already connected/connecting on attempt ${attempt}`,
+          );
+          return null;
+        }
+        if (status === 'QR_READY') {
+          console.log(`[OpenWA Controller] POLL QR - QR_READY status on attempt ${attempt}`);
+        }
+      } catch (error) {
+        console.log(`[OpenWA Controller] POLL QR - Attempt ${attempt}: Error:`, error);
+      }
+
+      // Wait before next attempt
+      if (attempt < maxAttempts) {
+        await new Promise((resolve) => setTimeout(resolve, intervalMs));
+      }
+    }
+
+    console.log(`[OpenWA Controller] POLL QR - Timed out after ${maxAttempts} attempts`);
+    return null;
   }
 
   @Get('sessions')

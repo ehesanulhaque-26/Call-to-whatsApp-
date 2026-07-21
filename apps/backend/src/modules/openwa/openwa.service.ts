@@ -271,7 +271,12 @@ export class OpenWAService {
   // OpenWA: POST /api/sessions/:id/start
   // Response: Session object with status
   async startSession(sessionId: string): Promise<OpenWASession> {
-    return this.request<OpenWASession>('POST', `/api/sessions/${sessionId}/start`);
+    this.logger.warn(
+      `[OpenWA Service] START SESSION - Sending POST /api/sessions/${sessionId}/start`,
+    );
+    const result = await this.request<OpenWASession>('POST', `/api/sessions/${sessionId}/start`);
+    this.logger.warn(`[OpenWA Service] START SESSION - Response: ${JSON.stringify(result)}`);
+    return result;
   }
 
   // Stop a session (logout)
