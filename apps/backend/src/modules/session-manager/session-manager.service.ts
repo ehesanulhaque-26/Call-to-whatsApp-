@@ -328,6 +328,133 @@ export class SessionManagerService implements OnModuleInit, OnModuleDestroy {
     return null;
   }
 
+  /**
+   * Start a session - calls POST /api/sessions/{id}/start
+   * This triggers the OpenWA server to initialize the session and generate a QR code
+   */
+  async startSession(sessionId: string, userId: string): Promise<void> {
+    const openWAClient = this.getClientBySessionId(sessionId);
+    if (!openWAClient || openWAClient.userId !== userId) {
+      throw new Error('Session not found or access denied');
+    }
+
+    this.logger.log(`[SessionManager] START SESSION - Starting session ${sessionId}`);
+    this.emitEvent(sessionId, userId, SessionStatus.LOADING);
+
+    try {
+      const fullUrl = `${this.baseURL}/api/sessions/${sessionId}/start`;
+      this.logger.warn(`[SessionManager] START SESSION - Sending POST to: ${fullUrl}`);
+
+      const response = await openWAClient.client.request({
+        method: 'POST',
+        url: `/api/sessions/${sessionId}/start`,
+      });
+
+      this.logger.warn(`[SessionManager] START SESSION - Response status: ${response.status}`);
+      this.logger.warn(
+        `[SessionManager] START SESSION - Response data: ${JSON.stringify(response.data)}`,
+      );
+
+      if (response.status === 200 || response.status === 201) {
+        this.logger.log(`[SessionManager] START SESSION - Session started successfully`);
+        this.emitEvent(sessionId, userId, SessionStatus.QR_GENERATED);
+      }
+    } catch (error) {
+      const axiosError = error as AxiosError;
+      this.logger.error(`[SessionManager] START SESSION - Failed: ${axiosError.message}`);
+      this.logger.error(`[SessionManager] START SESSION - Status: ${axiosError.response?.status}`);
+      this.logger.error(
+        `[SessionManager] START SESSION - Response: ${JSON.stringify(axiosError.response?.data)}`,
+      );
+      this.emitEvent(sessionId, userId, SessionStatus.ERROR, { error: 'Failed to start session' });
+      throw new Error(`Failed to start session: ${axiosError.message}`);
+    }
+  }
+
+  /**
+   * Poll for QR code until it's ready or timeout
+   * This checks the session status and retrieves the QR code when available
+   */
+  async pollForQRCode(
+    sessionId: string,
+    userId: string,
+    maxAttempts = 30,
+    intervalMs = 2000,
+  ): Promise<string | null> {
+    const openWAClient = this.getClientBySessionId(sessionId);
+    if (!openWAClient || openWAClient.userId !== userId) {
+      throw new Error('Session not found or access denied');
+    }
+
+    this.logger.log(
+      `[SessionManager] POLL QR - Starting poll for session ${sessionId}, maxAttempts: ${maxAttempts}`,
+    );
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        const fullUrl = `${this.baseURL}/api/sessions/${sessionId}/qr`;
+        this.logger.warn(
+          `[SessionManager] POLL QR - Attempt ${attempt}/${maxAttempts}: GET ${fullUrl}`,
+        );
+
+        const qrResponse = await openWAClient.client.request<{ qr?: string; qrCode?: string }>({
+          method: 'GET',
+          url: `/api/sessions/${sessionId}/qr`,
+        });
+
+        this.logger.warn(
+          `[SessionManager] POLL QR - Attempt ${attempt}: Response status: ${qrResponse.status}`,
+        );
+        this.logger.warn(
+          `[SessionManager] POLL QR - Attempt ${attempt}: Response data: ${JSON.stringify(qrResponse.data)}`,
+        );
+
+        const qrCode = qrResponse.data?.qr || qrResponse.data?.qrCode;
+        if (qrCode) {
+          openWAClient.status = SessionStatus.QR_GENERATED;
+          openWAClient.qrCode = qrCode;
+          this.emitEvent(sessionId, userId, SessionStatus.QR_GENERATED, { qr: qrCode });
+          this.startQrRefreshTimer(sessionId, userId);
+          this.logger.log(`[SessionManager] POLL QR - QR code received on attempt ${attempt}`);
+          return qrCode;
+        }
+
+        // Check if session is already connected
+        const statusResponse = await openWAClient.client.request<{ state?: string }>({
+          method: 'GET',
+          url: `/api/sessions/${sessionId}/status`,
+        });
+
+        const state = statusResponse.data?.state;
+        this.logger.warn(`[SessionManager] POLL QR - Attempt ${attempt}: Session state: ${state}`);
+
+        if (state === 'CONNECTED' || state === 'READY') {
+          this.logger.log(
+            `[SessionManager] POLL QR - Session already connected on attempt ${attempt}`,
+          );
+          openWAClient.status = SessionStatus.CONNECTED;
+          return null;
+        }
+      } catch (error) {
+        const axiosError = error as AxiosError;
+        this.logger.warn(
+          `[SessionManager] POLL QR - Attempt ${attempt}: Error: ${axiosError.message}`,
+        );
+        this.logger.warn(
+          `[SessionManager] POLL QR - Attempt ${attempt}: Status: ${axiosError.response?.status}`,
+        );
+      }
+
+      // Wait before next attempt
+      if (attempt < maxAttempts) {
+        await new Promise((resolve) => setTimeout(resolve, intervalMs));
+      }
+    }
+
+    this.logger.warn(`[SessionManager] POLL QR - Timed out after ${maxAttempts} attempts`);
+    return null;
+  }
+
   async getSessionStatus(
     sessionId: string,
     userId: string,

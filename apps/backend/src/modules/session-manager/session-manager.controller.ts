@@ -56,10 +56,17 @@ export class SessionManagerController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Create a new session' })
-  @ApiResponse({ status: 201, description: 'Session created' })
+  @ApiOperation({ summary: 'Create a new session and start it to get QR code' })
+  @ApiResponse({ status: 201, description: 'Session created and started' })
   async createSession(@Req() req: AuthenticatedRequest, @Body('sessionName') sessionName?: string) {
+    console.log(
+      `[SessionManager] CREATE SESSION - Starting flow for user ${req.user.userId}, name: ${sessionName}`,
+    );
+
+    // Step 1: Create the session
+    console.log(`[SessionManager] CREATE SESSION - Step 1: Creating session...`);
     const session = await this.sessionManager.createSession(req.user.userId, sessionName);
+    console.log(`[SessionManager] CREATE SESSION - Step 1: Session created: ${session.sessionId}`);
 
     await this.activityLogService.log({
       userId: req.user.userId,
@@ -68,9 +75,24 @@ export class SessionManagerController {
       ipAddress: req.ip,
     });
 
+    // Step 2: Start the session (this triggers QR generation)
+    console.log(
+      `[SessionManager] CREATE SESSION - Step 2: Starting session ${session.sessionId}...`,
+    );
+    await this.sessionManager.startSession(session.sessionId, req.user.userId);
+    console.log(`[SessionManager] CREATE SESSION - Step 2: Session start initiated`);
+
+    // Step 3: Poll for QR status until QR_READY or timeout
+    console.log(`[SessionManager] CREATE SESSION - Step 3: Polling for QR status...`);
+    const qrCode = await this.sessionManager.pollForQRCode(session.sessionId, req.user.userId);
+    console.log(
+      `[SessionManager] CREATE SESSION - Step 3: QR code received: ${qrCode ? 'YES (length: ' + qrCode.length + ')' : 'NO'}`,
+    );
+
     return {
       sessionId: session.sessionId,
-      status: session.status,
+      status: 'qr_generated',
+      qr: qrCode,
     };
   }
 
