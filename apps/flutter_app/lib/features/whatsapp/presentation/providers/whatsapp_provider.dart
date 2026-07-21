@@ -925,12 +925,21 @@ class WhatsAppNotifier extends StateNotifier<WhatsAppState> {
 
   /// Request a pairing code from the backend
   Future<String?> _requestPairingCode(String sessionId, String phoneNumber) async {
-    developer.log('[WhatsAppProvider] Requesting pairing code for session: $sessionId, phone: $phoneNumber', name: 'PhonePairing');
+    developer.log('[WhatsAppProvider] ========================================', name: 'PhonePairing');
+    developer.log('[WhatsAppProvider] Requesting pairing code for session: $sessionId', name: 'PhonePairing');
+    developer.log('[WhatsAppProvider] Received phone number: $phoneNumber', name: 'PhonePairing');
+    
+    // Validate phone number format before sending
+    final cleanPhone = phoneNumber.replaceAll(RegExp(r'[\s\-()+]'), '');
+    final normalizedPhone = cleanPhone.startsWith('+') ? cleanPhone : '+$cleanPhone';
+    developer.log('[WhatsAppProvider] Normalized phone number: $normalizedPhone', name: 'PhonePairing');
+    developer.log('[WhatsAppProvider] Sent to OpenWA: $normalizedPhone', name: 'PhonePairing');
+    developer.log('[WhatsAppProvider] ========================================', name: 'PhonePairing');
 
     try {
       final response = await _apiClient.post<Map<String, dynamic>>(
         '/openwa/sessions/$sessionId/pairing-code',
-        data: {'phoneNumber': phoneNumber},
+        data: {'phoneNumber': normalizedPhone},
       );
 
       developer.log('[WhatsAppProvider] Pairing code response status: ${response.statusCode}', name: 'PhonePairing');

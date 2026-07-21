@@ -280,20 +280,26 @@ export class SessionManagerService implements OnModuleInit, OnModuleDestroy {
         return;
       }
       try {
-        const status = await this.request<{ state: string; qr?: string }>(
+        // Use correct API path with /api prefix
+        const status = await this.request<{ state: string; qr?: string; phone?: string }>(
           openWAClient.client,
           'GET',
-          `/sessions/${sessionId}/status`,
+          `/api/sessions/${sessionId}/status`,
         );
+        
+        this.logger.log(`[SessionManager] QR REFRESH - Session ${sessionId} status: ${status.state}, phone: ${status.phone || 'none'}`);
+        
         if (status.state === 'QRCODE' && status.qr) {
           openWAClient.qrCode = status.qr;
           this.emitEvent(sessionId, userId, SessionStatus.QR_UPDATED, { qr: status.qr });
         } else if (status.state === 'CONNECTED' || status.state === 'READY') {
           openWAClient.status = SessionStatus.CONNECTED;
-          openWAClient.phone = status.state;
+          // Capture the phone number from the status response
+          openWAClient.phone = status.phone || openWAClient.phone;
           clearInterval(timer);
           this.qrTimers.delete(sessionId);
-          this.emitEvent(sessionId, userId, SessionStatus.CONNECTED);
+          this.logger.log(`[SessionManager] QR REFRESH - Session ${sessionId} CONNECTED with phone: ${openWAClient.phone}`);
+          this.emitEvent(sessionId, userId, SessionStatus.CONNECTED, { phone: openWAClient.phone });
           this.emitEvent(sessionId, userId, SessionStatus.READY);
         }
       } catch (error) {

@@ -1,9 +1,9 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../../../core/router/app_router.dart';
 import '../../../../core/theme/app_tokens.dart';
 import '../providers/whatsapp_provider.dart';
 
@@ -23,6 +23,9 @@ class _WhatsAppConnectScreenState extends ConsumerState<WhatsAppConnectScreen>
   // Country code
   String _countryCode = '+91';
   String _countryFlag = '🇮🇳';
+  
+  // Connection mode: true = QR, false = Phone (default)
+  bool _isQrMode = false;
   
   // Animation controller for success animation
   late AnimationController _successAnimationController;
@@ -86,10 +89,20 @@ class _WhatsAppConnectScreenState extends ConsumerState<WhatsAppConnectScreen>
     ref.read(whatsAppProvider.notifier).startPhonePairing(phoneNumber);
   }
 
-  void _onConnectWithQR() {
-    // Navigate to Sessions screen where QR flow is available
-    // The Sessions screen has the _QRConnectionSheet with QR code generation
-    context.go(AppRoutes.sessions);
+  Future<void> _onConnectWithQR() async {
+    // Switch to QR mode
+    setState(() {
+      _isQrMode = true;
+    });
+    
+    // Create session and get QR code
+    await ref.read(whatsAppProvider.notifier).createSession();
+  }
+
+  void _onCancelQR() {
+    setState(() {
+      _isQrMode = false;
+    });
   }
 
   void _onCancelPairing() {
@@ -115,6 +128,11 @@ class _WhatsAppConnectScreenState extends ConsumerState<WhatsAppConnectScreen>
     final pairingCode = whatsappState.pairingCode;
     final pairingError = whatsappState.pairingError;
     final phoneNumber = whatsappState.pairingPhoneNumber;
+    
+    // Get QR code from active session
+    final activeSession = whatsappState.activeSession;
+    final qrCode = activeSession?.qrCode;
+    final sessionStatus = activeSession?.status;
 
     // Auto-navigate when connected (only once)
     if (pairingStatus == PhonePairingStatus.connected && !_hasNavigated) {
@@ -123,12 +141,26 @@ class _WhatsAppConnectScreenState extends ConsumerState<WhatsAppConnectScreen>
         _onConnectionSuccess();
       });
     }
+    
+    // Auto-navigate when QR session is connected
+    if (_isQrMode && sessionStatus == WhatsAppStatus.connected && !_hasNavigated) {
+      _hasNavigated = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _onConnectionSuccess();
+      });
+    }
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Connect WhatsApp'),
+        title: Text(_isQrMode ? 'Scan QR Code' : 'Connect WhatsApp'),
         backgroundColor: Colors.transparent,
         elevation: 0,
+        leading: _isQrMode
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: _onCancelQR,
+              )
+            : null,
       ),
       extendBodyBehindAppBar: true,
       body: Container(
@@ -143,7 +175,14 @@ class _WhatsAppConnectScreenState extends ConsumerState<WhatsAppConnectScreen>
           ),
         ),
         child: SafeArea(
-          child: _buildBody(pairingStatus, pairingCode, pairingError, phoneNumber),
+          child: _buildBody(
+            pairingStatus,
+            pairingCode,
+            pairingError,
+            phoneNumber,
+            qrCode,
+            sessionStatus,
+          ),
         ),
       ),
     );
@@ -154,10 +193,17 @@ class _WhatsAppConnectScreenState extends ConsumerState<WhatsAppConnectScreen>
     String? pairingCode,
     String? pairingError,
     String? phoneNumber,
+    String? qrCode,
+    WhatsAppStatus? sessionStatus,
   ) {
     // Show success animation when connected
-    if (status == PhonePairingStatus.connected) {
+    if (status == PhonePairingStatus.connected || (_isQrMode && sessionStatus == WhatsAppStatus.connected)) {
       return _buildSuccessState();
+    }
+    
+    // Show QR code state when in QR mode
+    if (_isQrMode) {
+      return _buildQrState(qrCode, sessionStatus);
     }
 
     // Show pairing code state
@@ -439,6 +485,217 @@ class _WhatsAppConnectScreenState extends ConsumerState<WhatsAppConnectScreen>
         ),
       ),
     );
+  }
+
+  Widget _buildQrState(String? qrCode, WhatsAppStatus? status) {
+    final isLoading = status == WhatsAppStatus.connecting || status == WhatsAppStatus.waitingForQr;
+    
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const SizedBox(height: AppSpacing.xxl),
+          
+          // QR Icon
+          Container(
+            width: 100,
+            height: 100,
+            decoration: BoxDecoration(
+              color: AppColors.primary.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              isLoading ? Icons.hourglass_empty : Icons.qr_code,
+              size: 50,
+              color: AppColors.primary,
+            ),
+          ),
+          
+          const SizedBox(height: AppSpacing.xxl),
+          
+          Text(
+            isLoading ? 'Generating QR Code...' : 'Scan QR Code',
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          
+          const SizedBox(height: AppSpacing.lg),
+          
+          if (isLoading)
+            _buildLoadingIndicator()
+          else if (qrCode != null)
+            _buildQrCodeDisplay(qrCode)
+          else
+            _buildWaitingForQr(),
+          
+          const SizedBox(height: AppSpacing.xxl),
+          
+          // Instructions
+          Card(
+            elevation: 0,
+            color: AppColors.info.withOpacity(0.1),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppRadius.lg),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.info_outline, color: AppColors.info, size: 20),
+                      const SizedBox(width: AppSpacing.sm),
+                      Text(
+                        'How to scan',
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.info,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  _buildInstruction('1', 'Open WhatsApp on your phone'),
+                  _buildInstruction('2', 'Go to Settings > Linked Devices'),
+                  _buildInstruction('3', 'Tap "Link a Device"'),
+                  _buildInstruction('4', 'Point your phone at the QR code'),
+                ],
+              ),
+            ),
+          ),
+          
+          const SizedBox(height: AppSpacing.lg),
+          
+          // Cancel button
+          TextButton(
+            onPressed: _onCancelQR,
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLoadingIndicator() {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.xl),
+      child: const Column(
+        children: [
+          CircularProgressIndicator(color: AppColors.primary),
+          SizedBox(height: AppSpacing.md),
+          Text('Please wait...'),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQrCodeDisplay(String qrCode) {
+    return Card(
+      elevation: 4,
+      shadowColor: AppColors.primary.withOpacity(0.3),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadius.xl),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        child: Column(
+          children: [
+            // QR Code Image
+            Container(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(AppRadius.lg),
+              ),
+              child: Image.memory(
+                _decodeBase64Qr(qrCode),
+                width: 200,
+                height: 200,
+                fit: BoxFit.contain,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            Text(
+              'Scan within 60 seconds',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWaitingForQr() {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.xl),
+      child: Column(
+        children: [
+          const Icon(
+            Icons.qr_code_scanner,
+            size: 80,
+            color: AppColors.textSecondary,
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Text(
+            'QR code will appear here',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInstruction(String number, String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 20,
+            height: 20,
+            decoration: BoxDecoration(
+              color: AppColors.info.withOpacity(0.2),
+              shape: BoxShape.circle,
+            ),
+            child: Center(
+              child: Text(
+                number,
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.info,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Text(
+              text,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Uint8List _decodeBase64Qr(String base64String) {
+    // Remove data URL prefix if present
+    String cleanBase64 = base64String;
+    if (base64String.contains(',')) {
+      cleanBase64 = base64String.split(',').last;
+    }
+    return base64Decode(cleanBase64);
   }
 
   Widget _buildPairingCodeState(String pairingCode) {

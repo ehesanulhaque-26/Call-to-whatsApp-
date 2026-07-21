@@ -498,10 +498,14 @@ export class OpenWAService {
     this.logger.warn(
       `[OpenWA Service] PAIRING REQUEST - Phone number pairing requested for session: ${sessionId}`,
     );
-    this.logger.warn(`[OpenWA Service] PAIRING REQUEST - Phone validated: ${phoneNumber}`);
+    
+    // Log received phone number
+    this.logger.warn(`[OpenWA Service] PAIRING REQUEST - Phone number received: ${phoneNumber}`);
 
     // Validate phone number format (basic validation)
     const cleanedPhone = phoneNumber.replace(/[\s\-()]/g, '');
+    this.logger.warn(`[OpenWA Service] PAIRING REQUEST - Phone after cleaning: ${cleanedPhone}`);
+    
     if (!cleanedPhone.match(/^\+?\d{10,15}$/)) {
       this.logger.error(
         `[OpenWA Service] PAIRING REQUEST - Invalid phone number format: ${phoneNumber}`,
@@ -511,13 +515,14 @@ export class OpenWAService {
 
     // Normalize phone number to ensure it starts with +
     const normalizedPhone = cleanedPhone.startsWith('+') ? cleanedPhone : `+${cleanedPhone}`;
+    this.logger.warn(`[OpenWA Service] PAIRING REQUEST - Phone normalized: ${normalizedPhone}`);
 
     // Build the full OpenWA API URL for logging
     const openwaApiUrl = `${this.baseURL}/api/sessions/${sessionId}/pairing-code`;
 
     this.logger.warn(`[OpenWA Service] PAIRING REQUEST - Calling OpenWA pairing endpoint:`);
     this.logger.warn(`[OpenWA Service]   URL: ${openwaApiUrl}`);
-    this.logger.warn(`[OpenWA Service]   Phone: ${normalizedPhone}`);
+    this.logger.warn(`[OpenWA Service]   Phone sent to OpenWA: ${normalizedPhone}`);
     this.logger.warn(`[OpenWA Service]   Session ID: ${sessionId}`);
 
     try {
