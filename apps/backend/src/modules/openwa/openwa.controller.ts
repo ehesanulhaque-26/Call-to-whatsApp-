@@ -19,7 +19,25 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 @Controller('openwa')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class OpenWAController {
+  private currentPollingAbortController: AbortController | null = null;
+  private currentPollingSessionId: string | null = null;
+
   constructor(private readonly openWAService: OpenWAService) {}
+
+  /**
+   * Cancel any ongoing polling for a previous session
+   * This ensures only one session creation flow is active at a time
+   */
+  private cancelOngoingPolling(): void {
+    if (this.currentPollingAbortController) {
+      console.log(
+        `[OpenWA Controller] CANCEL POLLING - Aborting previous polling for session: ${this.currentPollingSessionId}`,
+      );
+      this.currentPollingAbortController.abort();
+      this.currentPollingAbortController = null;
+      this.currentPollingSessionId = null;
+    }
+  }
 
   @Get('health')
   @ApiOperation({ summary: 'Check OpenWA server health' })
@@ -36,6 +54,10 @@ export class OpenWAController {
   async createSession(@Body() body: { name: string; config?: Record<string, unknown> }) {
     console.log(`[OpenWA Controller] ========== ENTERED OpenWAController.createSession ==========`);
     console.log(`[OpenWA Controller] CREATE SESSION - Received body:`, JSON.stringify(body));
+
+    // CANCEL any ongoing polling from previous session creation
+    // This prevents stale polling loops from continuing after session deletion
+    this.cancelOngoingPolling();
 
     const sessionName = body?.name;
     console.log(`[OpenWA Controller] CREATE SESSION - Extracted name: "${sessionName}"`);
@@ -92,7 +114,28 @@ export class OpenWAController {
 
     // Step 3: Poll for QR code
     console.log(`[OpenWA Controller] CREATE SESSION - Step 3: Polling for QR code...`);
-    const qrCode = await this.pollForQRCode(sessionId);
+
+    // Create a new AbortController for this polling operation
+    // This allows us to cancel this polling if another session creation starts
+    this.currentPollingAbortController = new AbortController();
+    this.currentPollingSessionId = sessionId;
+    console.log(
+      `[OpenWA Controller] CREATE SESSION - Step 3: Starting polling for session: ${sessionId}`,
+    );
+
+    let qrCode: string | null = null;
+    try {
+      qrCode = await this.pollForQRCode(
+        sessionId,
+        30,
+        2000,
+        this.currentPollingAbortController.signal,
+      );
+    } finally {
+      // Clean up tracking after polling completes (success or abort)
+      this.currentPollingAbortController = null;
+      this.currentPollingSessionId = null;
+    }
 
     console.log(
       `[OpenWA Controller] CREATE SESSION - Step 3: QR code received: ${qrCode ? 'YES (length: ' + qrCode.length + ')' : 'NO'}`,
@@ -107,14 +150,35 @@ export class OpenWAController {
   }
 
   /**
-   * Poll for QR code until it's ready or timeout
+   * Poll for QR code until it's ready, timeout, or aborted
+   * @param sessionId - The session ID to poll
+   * @param maxAttempts - Maximum number of polling attempts
+   * @param intervalMs - Interval between attempts in milliseconds
+   * @param signal - AbortController signal to allow cancellation
    */
   private async pollForQRCode(
     sessionId: string,
     maxAttempts = 30,
     intervalMs = 2000,
+    signal?: AbortSignal,
   ): Promise<string | null> {
+    // Check if already aborted before starting
+    if (signal?.aborted) {
+      console.log(
+        `[OpenWA Controller] POLL QR - Aborted before starting for session: ${sessionId}`,
+      );
+      return null;
+    }
+
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      // Check for abort signal
+      if (signal?.aborted) {
+        console.log(
+          `[OpenWA Controller] POLL QR - Aborted on attempt ${attempt} for session: ${sessionId}`,
+        );
+        return null;
+      }
+
       console.log(
         `[OpenWA Controller] POLL QR - Attempt ${attempt}/${maxAttempts}: GET /api/sessions/${sessionId}/qr`,
       );
@@ -154,8 +218,8 @@ export class OpenWAController {
         console.log(`[OpenWA Controller] POLL QR - Attempt ${attempt}: Error:`, error);
       }
 
-      // Wait before next attempt
-      if (attempt < maxAttempts) {
+      // Wait before next attempt (unless aborted)
+      if (attempt < maxAttempts && !signal?.aborted) {
         await new Promise((resolve) => setTimeout(resolve, intervalMs));
       }
     }
