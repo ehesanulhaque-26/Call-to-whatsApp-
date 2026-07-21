@@ -7,19 +7,33 @@ import { OpenWAService } from '../openwa/openwa.service';
 describe('HealthService', () => {
   let service: HealthService;
 
-  const mockSupabaseService = {
-    query: jest.fn(),
-  };
-
-  const mockOpenWAService = {
-    healthCheck: jest.fn(),
-  };
-
-  const mockConfigService = {
-    get: jest.fn().mockReturnValue('test-url'),
-  };
+  // Mock Supabase client - recreated for each test
+  let mockSupabaseClient: any;
+  let mockSupabaseService: any;
+  let mockOpenWAService: any;
+  let mockConfigService: any;
 
   beforeEach(async () => {
+    // Create fresh mocks for each test
+    mockSupabaseClient = {
+      from: jest.fn().mockReturnThis(),
+      select: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockResolvedValue({ data: [], error: null }),
+    };
+
+    mockSupabaseService = {
+      getClient: jest.fn().mockReturnValue(mockSupabaseClient),
+      query: jest.fn(),
+    };
+
+    mockOpenWAService = {
+      healthCheck: jest.fn(),
+    };
+
+    mockConfigService = {
+      get: jest.fn().mockReturnValue('test-url'),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         HealthService,
@@ -39,9 +53,6 @@ describe('HealthService', () => {
     }).compile();
 
     service = module.get<HealthService>(HealthService);
-
-    // Reset mocks before each test
-    jest.clearAllMocks();
   });
 
   it('should be defined', () => {
@@ -57,7 +68,6 @@ describe('HealthService', () => {
 
   describe('getReadiness', () => {
     it('should return ready true when database is up', async () => {
-      mockSupabaseService.query.mockResolvedValue([]);
       mockOpenWAService.healthCheck.mockResolvedValue({
         status: 'ok',
         timestamp: new Date().toISOString(),
@@ -66,11 +76,10 @@ describe('HealthService', () => {
       const result = await service.getReadiness();
 
       expect(result).toEqual({ ready: true });
-      expect(mockSupabaseService.query).toHaveBeenCalledWith('users', { limit: 1 });
     });
 
     it('should return ready false when database is down', async () => {
-      mockSupabaseService.query.mockRejectedValue(new Error('Connection failed'));
+      mockSupabaseService.getClient.mockReturnValue(null);
 
       const result = await service.getReadiness();
 
@@ -80,7 +89,6 @@ describe('HealthService', () => {
 
   describe('getHealth', () => {
     it('should return healthy status when all services are up', async () => {
-      mockSupabaseService.query.mockResolvedValue([]);
       mockOpenWAService.healthCheck.mockResolvedValue({
         status: 'ok',
         timestamp: new Date().toISOString(),
@@ -97,7 +105,7 @@ describe('HealthService', () => {
     });
 
     it('should return unhealthy status when all services are down', async () => {
-      mockSupabaseService.query.mockRejectedValue(new Error('DB Error'));
+      mockSupabaseService.getClient.mockReturnValue(null);
       mockOpenWAService.healthCheck.mockRejectedValue(new Error('OpenWA Error'));
 
       const result = await service.getHealth();
@@ -108,7 +116,6 @@ describe('HealthService', () => {
     });
 
     it('should return degraded status when some services are down', async () => {
-      mockSupabaseService.query.mockResolvedValue([]);
       mockOpenWAService.healthCheck.mockRejectedValue(new Error('OpenWA Error'));
 
       const result = await service.getHealth();
@@ -119,7 +126,6 @@ describe('HealthService', () => {
     });
 
     it('should include latency for healthy services', async () => {
-      mockSupabaseService.query.mockResolvedValue([]);
       mockOpenWAService.healthCheck.mockResolvedValue({
         status: 'ok',
         timestamp: new Date().toISOString(),

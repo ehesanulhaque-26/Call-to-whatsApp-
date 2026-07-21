@@ -57,8 +57,12 @@ export class SessionManagerService implements OnModuleInit, OnModuleDestroy {
     private readonly configService: ConfigService,
     private readonly eventEmitter: EventEmitter2,
   ) {
-    // Use Railway private URL for service-to-service communication
-    this.baseURL = this.configService.get<string>('OPENWA_URL') || 'http://openwa.railway.internal';
+    // Get OpenWA URL from config or environment
+    // Use public Railway URL as fallback (same as OpenWAService)
+    this.baseURL =
+      this.configService.get<string>('OPENWA_URL') ||
+      process.env.OPENWA_URL ||
+      'https://openwa-production-d8f8.up.railway.app';
     this.sessionStoragePath = this.configService.get<string>('OPENWA_SESSION_PATH') || './sessions';
 
     this.logger.log(`[SessionManager] Initialized with OpenWA base URL: ${this.baseURL}`);

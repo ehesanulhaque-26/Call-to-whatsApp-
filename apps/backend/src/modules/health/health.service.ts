@@ -59,26 +59,33 @@ export class HealthService {
   private async checkDatabase(): Promise<ServiceStatus> {
     const start = Date.now();
     try {
-      // Supabase Auth doesn't use public.users table
-      // Instead, verify connection by checking the auth service is working
-      // We do this by verifying the Supabase client can make a simple RPC call
-      // For now, just verify the client is initialized (if it throws, we'll catch it)
+      // Verify actual database connectivity by querying the profiles table
+      // The profiles table is guaranteed to exist per the database migration
       const client = this.supabaseService.getClient();
       if (!client) {
         throw new Error('Supabase client not initialized');
       }
 
+      // Perform a lightweight query to verify actual database connectivity
+      const { error } = await client.from('profiles').select('id').limit(1);
+
+      if (error) {
+        throw new Error(`Database query failed: ${error.message}`);
+      }
+
       const latency = Date.now() - start;
-      this.logger.log(`Database health check passed - Supabase client initialized`);
+      this.logger.log(`Database health check passed - Supabase connected (${latency}ms)`);
       return {
         status: 'up',
         latency,
         message: 'Supabase connected',
       };
     } catch (error) {
+      const latency = Date.now() - start;
       this.logger.error(`Database health check failed: ${error}`);
       return {
         status: 'down',
+        latency,
         message: `Database connection failed: ${error instanceof Error ? error.message : String(error)}`,
       };
     }
