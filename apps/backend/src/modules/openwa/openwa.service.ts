@@ -166,6 +166,7 @@ export class OpenWAService {
     this.logger.warn('[OpenWA] Environment Configuration:');
 
     // Get OpenWA URL from config or environment
+    // Priority: configService > process.env > default production URL
     const openwaUrl =
       this.configService.get<string>('OPENWA_URL') ||
       process.env.OPENWA_URL ||
@@ -178,6 +179,7 @@ export class OpenWAService {
 
     this.logger.warn(`[OpenWA]   OPENWA_URL: ${openwaUrl}`);
     this.logger.warn(`[OpenWA]   OPENWA_API_KEY: ${this.apiKey ? '[SET]' : '[NOT SET]'}`);
+    this.logger.warn(`[OpenWA]   NODE_ENV: ${process.env.NODE_ENV || 'not set'}`);
     this.logger.warn('========================================');
 
     // Build headers with API key
@@ -510,9 +512,13 @@ export class OpenWAService {
     // Normalize phone number to ensure it starts with +
     const normalizedPhone = cleanedPhone.startsWith('+') ? cleanedPhone : `+${cleanedPhone}`;
 
-    this.logger.warn(
-      `[OpenWA Service] PAIRING REQUEST - Calling OpenWA pairing endpoint for phone: ${normalizedPhone}`,
-    );
+    // Build the full OpenWA API URL for logging
+    const openwaApiUrl = `${this.baseURL}/api/sessions/${sessionId}/pairing-code`;
+
+    this.logger.warn(`[OpenWA Service] PAIRING REQUEST - Calling OpenWA pairing endpoint:`);
+    this.logger.warn(`[OpenWA Service]   URL: ${openwaApiUrl}`);
+    this.logger.warn(`[OpenWA Service]   Phone: ${normalizedPhone}`);
+    this.logger.warn(`[OpenWA Service]   Session ID: ${sessionId}`);
 
     try {
       // Call OpenWA pairing endpoint
@@ -523,7 +529,7 @@ export class OpenWAService {
       );
 
       this.logger.warn(
-        `[OpenWA Service] PAIRING REQUEST - Pairing code received: ${response.pairingCode}`,
+        `[OpenWA Service] PAIRING REQUEST - ✅ SUCCESS - Pairing code received: ${response.pairingCode}`,
       );
       this.logger.warn(`[OpenWA Service] PAIRING REQUEST - Status: ${response.status}`);
 
@@ -536,23 +542,29 @@ export class OpenWAService {
       const axiosError = error as AxiosError;
       const response = axiosError.response;
 
+      this.logger.error(
+        `[OpenWA Service] PAIRING REQUEST - ❌ ERROR - Phone: ${normalizedPhone}, Session: ${sessionId}`,
+      );
+
       // Handle specific error cases from OpenWA
       if (response?.status) {
         switch (response.status) {
           case 400:
             this.logger.error(
-              `[OpenWA Service] PAIRING REQUEST - Bad request (invalid phone or session)`,
+              `[OpenWA Service] PAIRING REQUEST - ❌ HTTP 400 - Bad request (invalid phone or session)`,
             );
             throw new HttpException(
               'Invalid phone number or session state',
               HttpStatus.BAD_REQUEST,
             );
           case 404:
-            this.logger.error(`[OpenWA Service] PAIRING REQUEST - Session not found: ${sessionId}`);
+            this.logger.error(
+              `[OpenWA Service] PAIRING REQUEST - ❌ HTTP 404 - Session not found: ${sessionId}`,
+            );
             throw new HttpException('Session not found', HttpStatus.NOT_FOUND);
           case 409:
             this.logger.error(
-              `[OpenWA Service] PAIRING REQUEST - Session already connected: ${sessionId}`,
+              `[OpenWA Service] PAIRING REQUEST - ❌ HTTP 409 - Session already connected: ${sessionId}`,
             );
             throw new HttpException(
               'Session is already connected. Please disconnect first.',
@@ -560,7 +572,7 @@ export class OpenWAService {
             );
           case 408:
             this.logger.error(
-              `[OpenWA Service] PAIRING REQUEST - Pairing request timeout: ${sessionId}`,
+              `[OpenWA Service] PAIRING REQUEST - ❌ HTTP 408 - Pairing request timeout: ${sessionId}`,
             );
             throw new HttpException(
               'Pairing request timed out. Please try again.',
@@ -568,7 +580,7 @@ export class OpenWAService {
             );
           case 403:
             this.logger.error(
-              `[OpenWA Service] PAIRING REQUEST - Pairing rejected by WhatsApp: ${sessionId}`,
+              `[OpenWA Service] PAIRING REQUEST - ❌ HTTP 403 - Pairing rejected by WhatsApp: ${sessionId}`,
             );
             throw new HttpException(
               'Pairing request was rejected. Please try again later.',
@@ -576,14 +588,14 @@ export class OpenWAService {
             );
           default:
             this.logger.error(
-              `[OpenWA Service] PAIRING REQUEST - OpenWA error: ${response.status} - ${JSON.stringify(response.data)}`,
+              `[OpenWA Service] PAIRING REQUEST - ❌ HTTP ${response.status} - OpenWA error: ${JSON.stringify(response.data)}`,
             );
         }
       }
 
       // If it's a timeout error
       if (axiosError.code === 'ECONNABORTED' || axiosError.code === 'ETIMEDOUT') {
-        this.logger.error(`[OpenWA Service] PAIRING REQUEST - Request timeout`);
+        this.logger.error(`[OpenWA Service] PAIRING REQUEST - ❌ TIMEOUT - Request timed out`);
         throw new HttpException(
           'OpenWA request timed out. Please try again.',
           HttpStatus.GATEWAY_TIMEOUT,
@@ -592,7 +604,9 @@ export class OpenWAService {
 
       // If it's a connection error
       if (axiosError.code === 'ECONNREFUSED' || !axiosError.response) {
-        this.logger.error(`[OpenWA Service] PAIRING REQUEST - OpenWA server unavailable`);
+        this.logger.error(
+          `[OpenWA Service] PAIRING REQUEST - ❌ UNAVAILABLE - OpenWA server unreachable`,
+        );
         throw new HttpException('OpenWA server is unavailable', HttpStatus.SERVICE_UNAVAILABLE);
       }
 
