@@ -172,6 +172,21 @@ export class OpenWAController {
     return { sessions };
   }
 
+  // IMPORTANT: /status route must come BEFORE /:sessionId to avoid route conflict
+  // NestJS matches routes in order, so /status would be matched as sessionId="status" otherwise
+  @Get('sessions/:sessionId/status')
+  @ApiOperation({ summary: 'Get session status for polling (Flutter integration)' })
+  @ApiParam({ name: 'sessionId', description: 'Session ID (UUID)' })
+  @ApiResponse({ status: 200, description: 'Session status with state, qr, and phone' })
+  async getSessionStatus(@Param('sessionId') sessionId: string) {
+    console.log(
+      `[OpenWA Controller] GET SESSION STATUS - Received request for session: ${sessionId}`,
+    );
+    const status = await this.openWAService.getSessionStatus(sessionId);
+    console.log(`[OpenWA Controller] GET SESSION STATUS - Returning: ${JSON.stringify(status)}`);
+    return status;
+  }
+
   @Get('sessions/:sessionId')
   @ApiOperation({ summary: 'Get session details' })
   @ApiParam({ name: 'sessionId', description: 'Session ID (UUID)' })

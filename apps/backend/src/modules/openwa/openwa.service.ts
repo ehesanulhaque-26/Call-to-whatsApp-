@@ -55,6 +55,14 @@ export interface OpenWAQRCodeResponse {
   status: SessionStatus;
 }
 
+// Flutter session status response
+// Maps OpenWA session states to Flutter contract format
+export interface FlutterSessionStatusResponse {
+  state: string; // Maps to Flutter's WhatsAppStatus (e.g., 'DISCONNECTED', 'READY', 'CONNECTING')
+  qr?: string | null; // QR code for authentication (mapped from qrCode)
+  phone?: string | null; // Connected phone number
+}
+
 // Create session request body (OpenWA expects 'name', not 'sessionId')
 export interface CreateSessionRequest {
   name: string; // Required: alphanumeric and hyphens, 3-50 chars
@@ -417,6 +425,81 @@ export class OpenWAService {
   // Response: { qrCode: string, status: SessionStatus }
   async getQRCode(sessionId: string): Promise<OpenWAQRCodeResponse> {
     return this.request<OpenWAQRCodeResponse>('GET', `/api/sessions/${sessionId}/qr`);
+  }
+
+  // =====================================================
+  // SESSION STATUS (for Flutter polling)
+  // =====================================================
+
+  /**
+   * Get session status in Flutter contract format
+   * This endpoint is polled by the Flutter app to check session state
+   *
+   * OpenWA: GET /api/sessions/:id (for session data)
+   *         GET /api/sessions/:id/qr (for QR code, if available)
+   *
+   * Flutter expects: { state: string, qr?: string, phone?: string }
+   * State values: 'DISCONNECTED', 'CONNECTING', 'READY', 'QR_READY', etc.
+   */
+  async getSessionStatus(sessionId: string): Promise<FlutterSessionStatusResponse> {
+    this.logger.warn(
+      `[OpenWA Service] GET SESSION STATUS - Fetching status for session: ${sessionId}`,
+    );
+
+    try {
+      // Get session details from OpenWA
+      const session = await this.getSession(sessionId);
+      this.logger.warn(
+        `[OpenWA Service] GET SESSION STATUS - Session data: ${JSON.stringify({
+          id: session.id,
+          status: session.status,
+          phone: session.phone,
+        })}`,
+      );
+
+      // Map OpenWA status to Flutter format
+      // OpenWA statuses: CREATED, QR_READY, CONNECTING, READY, DISCONNECTED, FAILED
+      let qr: string | null = null;
+
+      // Try to get QR code if session is in QR state
+      if (session.status === SessionStatus.QR_READY || session.status === SessionStatus.CREATED) {
+        try {
+          const qrResponse = await this.getQRCode(sessionId);
+          if (qrResponse?.qrCode) {
+            qr = qrResponse.qrCode;
+            this.logger.warn(
+              `[OpenWA Service] GET SESSION STATUS - QR code retrieved (length: ${qr.length})`,
+            );
+          }
+        } catch (qrError) {
+          // QR might not be available yet, that's ok
+          this.logger.warn(
+            `[OpenWA Service] GET SESSION STATUS - QR not available yet: ${qrError}`,
+          );
+        }
+      }
+
+      const result: FlutterSessionStatusResponse = {
+        state: session.status,
+        qr: qr,
+        phone: session.phone || null,
+      };
+
+      this.logger.warn(
+        `[OpenWA Service] GET SESSION STATUS - Returning: ${JSON.stringify(result)}`,
+      );
+
+      return result;
+    } catch (error) {
+      this.logger.error(`[OpenWA Service] GET SESSION STATUS - Error: ${error}`);
+
+      // Return disconnected state if session not found or error
+      return {
+        state: 'DISCONNECTED',
+        qr: null,
+        phone: null,
+      };
+    }
   }
 
   // Reconnect - OpenWA doesn't have /reconnect endpoint
