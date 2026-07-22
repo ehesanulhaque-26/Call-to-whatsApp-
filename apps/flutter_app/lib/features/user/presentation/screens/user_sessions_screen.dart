@@ -477,7 +477,6 @@ class _QRConnectionSheet extends ConsumerStatefulWidget {
 class _QRConnectionSheetState extends ConsumerState<_QRConnectionSheet> {
   String? _sessionId;
   bool _isLoading = true;
-  bool _hasError = false;
   String _errorMessage = '';
 
   @override
@@ -504,7 +503,7 @@ class _QRConnectionSheetState extends ConsumerState<_QRConnectionSheet> {
   Future<void> _createSession({String? sessionName}) async {
     setState(() {
       _isLoading = true;
-      _error = null;
+      _errorMessage = '';
     });
 
     try {
@@ -519,13 +518,13 @@ class _QRConnectionSheetState extends ConsumerState<_QRConnectionSheet> {
       } else {
         setState(() {
           _isLoading = false;
-          _error = 'Failed to create session';
+          _errorMessage = 'Failed to create session';
         });
       }
     } catch (e) {
       setState(() {
         _isLoading = false;
-        _error = 'Failed to create session';
+        _errorMessage = 'Failed to create session';
       });
     }
   }
@@ -574,7 +573,7 @@ class _QRConnectionSheetState extends ConsumerState<_QRConnectionSheet> {
     setState(() {
       _sessionId = null;
       _isLoading = true;
-      _error = null;
+      _errorMessage = '';
     });
     
     await _createSession();
@@ -600,7 +599,7 @@ class _QRConnectionSheetState extends ConsumerState<_QRConnectionSheet> {
     // Determine states from provider
     final isLoading = _isLoading || (currentSession?.status == WhatsAppStatus.connecting) || whatsAppState.isLoading;
     final isConnected = currentSession?.status == WhatsAppStatus.connected;
-    final hasError = _error != null || currentSession?.status == WhatsAppStatus.error;
+    final hasError = _errorMessage.isNotEmpty || currentSession?.status == WhatsAppStatus.error;
     final qrCode = currentSession?.qrCode;
     
     // Auto-close when connected
@@ -779,7 +778,7 @@ class _QRConnectionSheetState extends ConsumerState<_QRConnectionSheet> {
         ),
         const SizedBox(height: AppSpacing.sm),
         Text(
-          _error ?? 'An error occurred',
+          _errorMessage.isEmpty ? 'An error occurred' : _errorMessage,
           style: Theme.of(context)
               .textTheme
               .bodyMedium
