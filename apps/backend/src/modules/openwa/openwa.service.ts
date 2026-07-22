@@ -465,35 +465,37 @@ export class OpenWAService {
     // Log received phone number
     this.logger.warn(`[OpenWA Service] PAIRING REQUEST - Phone number received: ${phoneNumber}`);
 
-    // Validate phone number format (basic validation)
-    const cleanedPhone = phoneNumber.replace(/[\s\-()]/g, '');
-    this.logger.warn(`[OpenWA Service] PAIRING REQUEST - Phone after cleaning: ${cleanedPhone}`);
-    
-    if (!cleanedPhone.match(/^\+?\d{10,15}$/)) {
+    // Step 1: Remove all non-digit characters (spaces, dashes, parentheses, plus sign)
+    const digitsOnly = phoneNumber.replace(/\D/g, '');
+    this.logger.warn(`[OpenWA Service] PAIRING REQUEST - Digits only: ${digitsOnly}`);
+
+    // Step 2: Validate digits only format
+    if (!digitsOnly.match(/^\d{10,15}$/)) {
       this.logger.error(
-        `[OpenWA Service] PAIRING REQUEST - Invalid phone number format: ${phoneNumber}`,
+        `[OpenWA Service] PAIRING REQUEST - Invalid phone number format: ${phoneNumber} (digits: ${digitsOnly})`,
       );
-      throw new HttpException('Invalid phone number format', HttpStatus.BAD_REQUEST);
+      throw new HttpException('Invalid phone number format. Use country code + number (e.g., 918123456789)', HttpStatus.BAD_REQUEST);
     }
 
-    // Normalize phone number to ensure it starts with +
-    const normalizedPhone = cleanedPhone.startsWith('+') ? cleanedPhone : `+${cleanedPhone}`;
-    this.logger.warn(`[OpenWA Service] PAIRING REQUEST - Phone normalized: ${normalizedPhone}`);
+    // OpenWA requires digits only, no leading + or 00
+    // Example: +918420081652 should become 918420081652
+    const openWAPhone = digitsOnly.startsWith('00') ? digitsOnly.substring(2) : digitsOnly;
+    this.logger.warn(`[OpenWA Service] PAIRING REQUEST - Phone for OpenWA: ${openWAPhone}`);
 
     // Build the full OpenWA API URL for logging
     const openwaApiUrl = `${this.baseURL}/api/sessions/${sessionId}/pairing-code`;
 
     this.logger.warn(`[OpenWA Service] PAIRING REQUEST - Calling OpenWA pairing endpoint:`);
     this.logger.warn(`[OpenWA Service]   URL: ${openwaApiUrl}`);
-    this.logger.warn(`[OpenWA Service]   Phone sent to OpenWA: ${normalizedPhone}`);
+    this.logger.warn(`[OpenWA Service]   Phone sent to OpenWA: ${openWAPhone}`);
     this.logger.warn(`[OpenWA Service]   Session ID: ${sessionId}`);
 
     try {
-      // Call OpenWA pairing endpoint
+      // Call OpenWA pairing endpoint with digits-only phone number
       const response = await this.request<OpenWAPairingCodeResponse>(
         'POST',
         `/api/sessions/${sessionId}/pairing-code`,
-        { phoneNumber: normalizedPhone },
+        { phoneNumber: openWAPhone },
       );
 
       this.logger.warn(
@@ -511,7 +513,7 @@ export class OpenWAService {
       const response = axiosError.response;
 
       this.logger.error(
-        `[OpenWA Service] PAIRING REQUEST - ❌ ERROR - Phone: ${normalizedPhone}, Session: ${sessionId}`,
+        `[OpenWA Service] PAIRING REQUEST - ❌ ERROR - Phone: ${openWAPhone}, Session: ${sessionId}`,
       );
 
       // Handle specific error cases from OpenWA

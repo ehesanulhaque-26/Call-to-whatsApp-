@@ -947,17 +947,15 @@ class WhatsAppNotifier extends StateNotifier<WhatsAppState> {
     developer.log('[WhatsAppProvider] Requesting pairing code for session: $sessionId', name: 'PhonePairing');
     developer.log('[WhatsAppProvider] Received phone number: $phoneNumber', name: 'PhonePairing');
     
-    // Validate phone number format before sending
-    final cleanPhone = phoneNumber.replaceAll(RegExp(r'[\s\-()+]'), '');
-    final normalizedPhone = cleanPhone.startsWith('+') ? cleanPhone : '+$cleanPhone';
-    developer.log('[WhatsAppProvider] Normalized phone number: $normalizedPhone', name: 'PhonePairing');
-    developer.log('[WhatsAppProvider] Sent to OpenWA: $normalizedPhone', name: 'PhonePairing');
+    // Backend handles all normalization (strips +, spaces, etc.)
+    // Just send the phone as-is
+    developer.log('[WhatsAppProvider] Sent to backend: $phoneNumber', name: 'PhonePairing');
     developer.log('[WhatsAppProvider] ========================================', name: 'PhonePairing');
 
     try {
       final response = await _apiClient.post<Map<String, dynamic>>(
         '/openwa/sessions/$sessionId/pairing-code',
-        data: {'phoneNumber': normalizedPhone},
+        data: {'phoneNumber': phoneNumber},
       );
 
       developer.log('[WhatsAppProvider] Pairing code response status: ${response.statusCode}', name: 'PhonePairing');

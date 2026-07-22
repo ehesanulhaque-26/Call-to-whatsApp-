@@ -488,7 +488,9 @@ class _WhatsAppConnectScreenState extends ConsumerState<WhatsAppConnectScreen>
   }
 
   Widget _buildQrState(String? qrCode, WhatsAppStatus? status) {
-    final isLoading = status == WhatsAppStatus.connecting || status == WhatsAppStatus.waitingForQr;
+    // Show QR immediately when available, regardless of status
+    // Only show loading if QR is not yet available
+    final showLoading = qrCode == null && (status == WhatsAppStatus.connecting || status == WhatsAppStatus.waitingForQr);
     
     return SingleChildScrollView(
       padding: const EdgeInsets.all(AppSpacing.lg),
@@ -506,7 +508,7 @@ class _WhatsAppConnectScreenState extends ConsumerState<WhatsAppConnectScreen>
               shape: BoxShape.circle,
             ),
             child: Icon(
-              isLoading ? Icons.hourglass_empty : Icons.qr_code,
+              showLoading ? Icons.hourglass_empty : Icons.qr_code,
               size: 50,
               color: AppColors.primary,
             ),
@@ -515,7 +517,7 @@ class _WhatsAppConnectScreenState extends ConsumerState<WhatsAppConnectScreen>
           const SizedBox(height: AppSpacing.xxl),
           
           Text(
-            isLoading ? 'Generating QR Code...' : 'Scan QR Code',
+            showLoading ? 'Generating QR Code...' : 'Scan QR Code',
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
               fontWeight: FontWeight.bold,
             ),
@@ -524,10 +526,11 @@ class _WhatsAppConnectScreenState extends ConsumerState<WhatsAppConnectScreen>
           
           const SizedBox(height: AppSpacing.lg),
           
-          if (isLoading)
-            _buildLoadingIndicator()
-          else if (qrCode != null)
+          // Show QR immediately when available, otherwise show loading or waiting
+          if (qrCode != null)
             _buildQrCodeDisplay(qrCode)
+          else if (showLoading)
+            _buildLoadingIndicator()
           else
             _buildWaitingForQr(),
           
