@@ -84,23 +84,60 @@ export class OpenWAController {
       console.log(`[OpenWA Controller] CREATE SESSION - Generated name: "${finalName}"`);
     }
 
-    // Step 0: Check for existing sessions and cleanup if needed
-    // This helps if there are stuck sessions blocking new ones
+    // Step 0: Check for existing sessions
+    // Only delete sessions that are NOT in a ready/active state
+    // We preserve QR_READY sessions because they may be in use for pairing or QR scanning
     console.log(`[OpenWA Controller] CREATE SESSION - Step 0: Checking for existing sessions...`);
     const existingSessions = await this.openWAService.getAllSessions();
     console.log(
       `[OpenWA Controller] CREATE SESSION - Step 0: Found ${existingSessions.length} existing sessions`,
     );
 
+    // Normalize status for comparison (OpenWA returns various formats)
+    const activeStatuses = ['qr_ready', 'QR_READY', 'connecting', 'CONNECTING', 'authenticated', 'AUTHENTICATED'];
+    
     if (existingSessions.length > 0) {
-      console.log(`[OpenWA Controller] CREATE SESSION - Step 0: Cleaning up existing sessions...`);
       for (const session of existingSessions) {
-        console.log(
-          `[OpenWA Controller] CREATE SESSION - Step 0:   Deleting session: ${session.id} (status: ${session.status})`,
-        );
-        await this.openWAService.deleteSessionFromServer(session.id);
+        const isActive = activeStatuses.includes(session.status) || 
+                         session.status?.toLowerCase().includes('ready') ||
+                         session.status?.toLowerCase().includes('connecting');
+        
+        if (isActive) {
+          // Session is active - check if it has a QR code we can reuse
+          console.log(
+            `[OpenWA Controller] CREATE SESSION - Step 0:   Session ${session.id} is ACTIVE (status: ${session.status}), checking for QR...`,
+          );
+          
+          try {
+            const qrResponse = await this.openWAService.getQRCode(session.id);
+            if (qrResponse?.qrCode) {
+              // Reuse existing active session with QR
+              console.log(
+                `[OpenWA Controller] CREATE SESSION - Step 0:   REUSING active session ${session.id} with existing QR`,
+              );
+                
+              // Return existing session with its QR code
+              return {
+                id: session.id,
+                name: session.name,
+                qr: qrResponse.qrCode,
+                status: 'qr_generated',
+              };
+            }
+          } catch (qrError) {
+            // No QR available, will proceed to create new session
+            console.log(
+              `[OpenWA Controller] CREATE SESSION - Step 0:   Session ${session.id} has no QR, will create new`,
+            );
+          }
+        } else {
+          // Session is not active (created, disconnected, failed) - safe to delete
+          console.log(
+            `[OpenWA Controller] CREATE SESSION - Step 0:   Deleting INACTIVE session: ${session.id} (status: ${session.status})`,
+          );
+          await this.openWAService.deleteSessionFromServer(session.id);
+        }
       }
-      console.log(`[OpenWA Controller] CREATE SESSION - Step 0: Cleanup complete`);
     }
 
     // Step 1: Create the session
