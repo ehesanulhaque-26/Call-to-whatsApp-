@@ -806,6 +806,40 @@ class WhatsAppNotifier extends StateNotifier<WhatsAppState> {
     }
   }
 
+  /// Delete a session and remove it from state
+  Future<void> deleteSession(String sessionId) async {
+    try {
+      state = state.copyWith(isLoading: true, error: null);
+
+      await _apiClient.delete('/openwa/sessions/$sessionId');
+
+      // Remove from sessions list
+      final sessions = List<WhatsAppSession>.from(state.sessions);
+      sessions.removeWhere((s) => s.sessionId == sessionId);
+
+      // Clear active session if it was deleted
+      final activeSession = state.activeSession?.sessionId == sessionId 
+          ? null 
+          : state.activeSession;
+
+      state = state.copyWith(
+        sessions: sessions,
+        activeSession: activeSession,
+        isLoading: false,
+      );
+    } on DioException catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: e.message ?? 'Failed to delete session',
+      );
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: 'Failed to delete session: $e',
+      );
+    }
+  }
+
   Timer? _statusPollTimer;
   
   void _pollSessionStatus(String sessionId) {

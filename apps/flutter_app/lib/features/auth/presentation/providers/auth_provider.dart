@@ -88,6 +88,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
           '[AuthNotifier] LOGIN: Success, role=${state.role}',
           name: 'Auth',
         );
+        
+        // Load sessions after successful login (restore from Supabase)
+        _ref.read(whatsAppProvider.notifier).loadSessions();
+        
         return true;
       } else {
         state = state.copyWith(

@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -476,12 +475,10 @@ class _QRConnectionSheet extends ConsumerStatefulWidget {
 }
 
 class _QRConnectionSheetState extends ConsumerState<_QRConnectionSheet> {
-  Timer? _pollingTimer;
   String? _sessionId;
-  String? _qrCode;
   bool _isLoading = true;
-  bool _isConnected = false;
-  String? _error;
+  bool _hasError = false;
+  String _errorMessage = '';
 
   @override
   void initState() {
@@ -501,7 +498,6 @@ class _QRConnectionSheetState extends ConsumerState<_QRConnectionSheet> {
 
   @override
   void dispose() {
-    _pollingTimer?.cancel();
     super.dispose();
   }
 
@@ -512,13 +508,20 @@ class _QRConnectionSheetState extends ConsumerState<_QRConnectionSheet> {
     });
 
     try {
-      final repo = ref.read(whatsAppRepositoryProvider);
-      final session = await repo.createSession(sessionName: sessionName);
-      setState(() {
-        _sessionId = session.id;
-        _isLoading = false;
-      });
-      _startPolling();
+      // Use the provider's createSession which handles polling internally
+      final session = await ref.read(whatsAppProvider.notifier).createSession(name: sessionName);
+      if (session != null) {
+        setState(() {
+          _sessionId = session.sessionId;
+          _isLoading = false;
+        });
+        // Polling is now handled internally by the provider
+      } else {
+        setState(() {
+          _isLoading = false;
+          _error = 'Failed to create session';
+        });
+      }
     } catch (e) {
       setState(() {
         _isLoading = false;
@@ -559,49 +562,59 @@ class _QRConnectionSheetState extends ConsumerState<_QRConnectionSheet> {
     return result;
   }
 
-  void _startPolling() {
-    _pollingTimer = Timer.periodic(const Duration(seconds: 3), (_) async {
-      if (_isConnected || _sessionId == null) {
-        _pollingTimer?.cancel();
-        return;
-      }
-
-      try {
-        final repo = ref.read(whatsAppRepositoryProvider);
-        final status = await repo.getSessionStatus(_sessionId!);
-
-        if (status.qr != null || status.qrCode != null) {
-          setState(() {
-            _qrCode = status.qr ?? status.qrCode;
-          });
-        }
-
-        if (status.state == 'connected') {
-          HapticFeedback.heavyImpact();
-          setState(() {
-            _isConnected = true;
-          });
-          _pollingTimer?.cancel();
-          await Future.delayed(const Duration(seconds: 2));
-          if (mounted) {
-            Navigator.pop(context);
-            ref.invalidate(sessionsProvider);
-          }
-        }
-      } catch (_) {}
-    });
-  }
 
   Future<void> _regenerateQR() async {
+    // Delete current session and create a new one via provider
+    if (_sessionId != null) {
+      try {
+        await ref.read(whatsAppProvider.notifier).deleteSession(_sessionId!);
+      } catch (_) {}
+    }
+    
     setState(() {
-      _qrCode = null;
+      _sessionId = null;
       _isLoading = true;
+      _error = null;
     });
+    
     await _createSession();
   }
 
   @override
   Widget build(BuildContext context) {
+    // Watch provider state - single source of truth
+    final whatsAppState = ref.watch(whatsAppProvider);
+    
+    // Get session from provider
+    WhatsAppSession? currentSession;
+    if (_sessionId != null) {
+      try {
+        currentSession = whatsAppState.sessions.firstWhere(
+          (s) => s.sessionId == _sessionId,
+        );
+      } catch (_) {
+        currentSession = null;
+      }
+    }
+    
+    // Determine states from provider
+    final isLoading = _isLoading || (currentSession?.status == WhatsAppStatus.connecting) || whatsAppState.isLoading;
+    final isConnected = currentSession?.status == WhatsAppStatus.connected;
+    final hasError = _error != null || currentSession?.status == WhatsAppStatus.error;
+    final qrCode = currentSession?.qrCode;
+    
+    // Auto-close when connected
+    if (isConnected == true && _sessionId != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        HapticFeedback.heavyImpact();
+        await Future.delayed(const Duration(seconds: 1));
+        if (mounted) {
+          Navigator.pop(context);
+          ref.invalidate(sessionsProvider);
+        }
+      });
+    }
+    
     return Container(
       height: MediaQuery.of(context).size.height * 0.85,
       decoration: BoxDecoration(
@@ -638,15 +651,15 @@ class _QRConnectionSheetState extends ConsumerState<_QRConnectionSheet> {
           ),
           const SizedBox(height: AppSpacing.xl),
           Expanded(
-            child: _isLoading
+            child: isLoading
                 ? const Center(child: CircularProgressIndicator())
-                : _isConnected
+                : isConnected == true
                     ? _buildConnectedState()
-                    : _error != null
+                    : hasError
                         ? _buildErrorState()
-                        : _buildQRState(),
+                        : _buildQRState(qrCode),
           ),
-          if (_qrCode != null && !_isConnected)
+          if (qrCode != null && isConnected != true)
             Padding(
               padding: const EdgeInsets.all(AppSpacing.lg),
               child: Row(
@@ -672,11 +685,11 @@ class _QRConnectionSheetState extends ConsumerState<_QRConnectionSheet> {
     );
   }
 
-  Widget _buildQRState() {
+  Widget _buildQRState(String? qrCode) {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        if (_qrCode != null)
+        if (qrCode != null)
           Container(
             padding: const EdgeInsets.all(AppSpacing.md),
             margin: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
@@ -688,7 +701,7 @@ class _QRConnectionSheetState extends ConsumerState<_QRConnectionSheet> {
               ],
             ),
             child: Image.memory(
-              base64Decode(_qrCode!.replaceAll('data:image/png;base64,', '')),
+              base64Decode(qrCode.replaceAll('data:image/png;base64,', '')),
               width: 250,
               height: 250,
             ),
@@ -898,8 +911,8 @@ class _SessionDetailsSheet extends ConsumerWidget {
                       ),
                     );
                     if (confirmed == true) {
-                      final repo = ref.read(whatsAppRepositoryProvider);
-                      await repo.deleteSession(session.id);
+                      // Use provider for delete - single source of truth
+                      await ref.read(whatsAppProvider.notifier).deleteSession(session.id);
                       if (context.mounted) {
                         Navigator.pop(context);
                         ref.invalidate(sessionsProvider);
