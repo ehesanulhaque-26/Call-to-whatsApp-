@@ -2,6 +2,7 @@ import { Injectable, Logger, HttpException, HttpStatus } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios, { AxiosInstance, AxiosError } from 'axios';
 import { SessionStatus, normalizeOpenWAStatus } from '../../common/types/session.types';
+import { sanitizeSessionName } from '../../common/utils/session-name.sanitizer';
 
 /**
  * Separate axios instance for fire-and-forget requests
@@ -268,10 +269,13 @@ export class OpenWAService {
   // Body: { name: string, config?: object, proxyUrl?: string, proxyType?: string }
   // Response: Session object
   async createSession(name: string, config?: Record<string, unknown>): Promise<OpenWASession> {
-    const payload: CreateSessionRequest = { name };
+    // Sanitize the session name for OpenWA compatibility
+    // OpenWA only accepts: A-Z, a-z, 0-9, and hyphens
+    const sanitizedName = sanitizeSessionName(name);
+    const payload: CreateSessionRequest = { name: sanitizedName };
     if (config) payload.config = config;
 
-    this.logger.warn(`[OpenWA] CREATE SESSION: name="${name}"`);
+    this.logger.warn(`[OpenWA] CREATE SESSION: original="${name}" -> sanitized="${sanitizedName}"`);
     return this.request<OpenWASession>('POST', '/api/sessions', payload);
   }
 
