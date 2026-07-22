@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:developer' as developer;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:openwa_saas/core/services/api_client.dart';
@@ -33,49 +34,113 @@ enum PhonePairingStatus {
   failed,
 }
 
+/// Contact sync status
+enum ContactSyncStatus {
+  idle,
+  syncing,
+  completed,
+  failed,
+}
+
+/// Contact model for sync
+class WhatsAppContact {
+  final String id;
+  final String? name;
+  final String? pushName;
+  final String phone;
+  final String? profilePictureUrl;
+  final bool isBusiness;
+  final DateTime? lastSyncAt;
+
+  WhatsAppContact({
+    required this.id,
+    this.name,
+    this.pushName,
+    required this.phone,
+    this.profilePictureUrl,
+    this.isBusiness = false,
+    this.lastSyncAt,
+  });
+
+  factory WhatsAppContact.fromJson(Map<String, dynamic> json) {
+    return WhatsAppContact(
+      id: json['id'] ?? json['wid'] ?? '',
+      name: json['name'],
+      pushName: json['pushName'] ?? json['push_name'],
+      phone: json['phone'] ?? json['id'] ?? '',
+      profilePictureUrl: json['profilePictureUrl'] ?? json['profile_picture_url'],
+      isBusiness: json['isBusiness'] ?? json['is_business'] ?? false,
+      lastSyncAt: json['lastSyncAt'] != null 
+          ? DateTime.tryParse(json['lastSyncAt'].toString()) 
+          : null,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'pushName': pushName,
+      'phone': phone,
+      'profilePictureUrl': profilePictureUrl,
+      'isBusiness': isBusiness,
+      'lastSyncAt': lastSyncAt?.toIso8601String(),
+    };
+  }
+}
+
 /// WhatsApp session model
 class WhatsAppSession {
   final String sessionId;
+  final String? name; // User-friendly session name
   final WhatsAppStatus status;
   final String? phone;
   final String? deviceName;
   final int messageCount;
   final DateTime? lastActivity;
   final String? qrCode;
+  final DateTime? lastSyncAt; // Last contact sync timestamp
 
   WhatsAppSession({
     required this.sessionId,
+    this.name,
     required this.status,
     this.phone,
     this.deviceName,
     this.messageCount = 0,
     this.lastActivity,
     this.qrCode,
+    this.lastSyncAt,
   });
 
   WhatsAppSession copyWith({
     String? sessionId,
+    String? name,
     WhatsAppStatus? status,
     String? phone,
     String? deviceName,
     int? messageCount,
     DateTime? lastActivity,
     String? qrCode,
+    DateTime? lastSyncAt,
   }) {
     return WhatsAppSession(
       sessionId: sessionId ?? this.sessionId,
+      name: name ?? this.name,
       status: status ?? this.status,
       phone: phone ?? this.phone,
       deviceName: deviceName ?? this.deviceName,
       messageCount: messageCount ?? this.messageCount,
       lastActivity: lastActivity ?? this.lastActivity,
       qrCode: qrCode ?? this.qrCode,
+      lastSyncAt: lastSyncAt ?? this.lastSyncAt,
     );
   }
 
   factory WhatsAppSession.fromJson(Map<String, dynamic> json) {
     return WhatsAppSession(
-      sessionId: json['sessionId'] ?? json['session_id'] ?? '',
+      sessionId: json['sessionId'] ?? json['session_id'] ?? json['id'] ?? '',
+      name: json['name'],
       status: parseStatus(json['status'] ?? ''),
       phone: json['phone'],
       deviceName: json['deviceName'] ?? json['device_name'],
@@ -83,8 +148,25 @@ class WhatsAppSession {
       lastActivity: json['lastActivity'] != null
           ? DateTime.tryParse(json['lastActivity'].toString())
           : null,
-      qrCode: json['qrCode'] ?? json['qr_code'],
+      qrCode: json['qrCode'] ?? json['qr_code'] ?? json['qr'],
+      lastSyncAt: json['lastSyncAt'] != null
+          ? DateTime.tryParse(json['lastSyncAt'].toString())
+          : null,
     );
+  }
+  
+  Map<String, dynamic> toJson() {
+    return {
+      'sessionId': sessionId,
+      'name': name,
+      'status': status.name,
+      'phone': phone,
+      'deviceName': deviceName,
+      'messageCount': messageCount,
+      'lastActivity': lastActivity?.toIso8601String(),
+      'qrCode': qrCode,
+      'lastSyncAt': lastSyncAt?.toIso8601String(),
+    };
   }
 
   /// Parse status string to WhatsAppStatus enum
@@ -180,6 +262,13 @@ class WhatsAppState {
   final String? pairingPhoneNumber;
   final String? pairingError;
 
+  // Contact sync state
+  final List<WhatsAppContact> contacts;
+  final ContactSyncStatus contactSyncStatus;
+  final String? contactSyncError;
+  final int? lastSyncedContactCount;
+  final bool isInitialized; // Whether sessions have been loaded from backend
+
   WhatsAppState({
     this.sessions = const [],
     this.activeSession,
@@ -191,6 +280,11 @@ class WhatsAppState {
     this.pairingCode,
     this.pairingPhoneNumber,
     this.pairingError,
+    this.contacts = const [],
+    this.contactSyncStatus = ContactSyncStatus.idle,
+    this.contactSyncError,
+    this.lastSyncedContactCount,
+    this.isInitialized = false,
   });
 
   /// Get primary connection (for backward compatibility)
@@ -213,6 +307,14 @@ class WhatsAppState {
   bool get isConnected {
     return connectionState == ConnectionState.connected;
   }
+  
+  /// Get display name for active session
+  String get activeSessionDisplayName {
+    if (activeSession?.name != null && activeSession!.name!.isNotEmpty) {
+      return activeSession!.name!;
+    }
+    return activeSession?.phone ?? 'Session';
+  }
 
   WhatsAppState copyWith({
     List<WhatsAppSession>? sessions,
@@ -225,10 +327,16 @@ class WhatsAppState {
     String? pairingCode,
     String? pairingPhoneNumber,
     String? pairingError,
+    List<WhatsAppContact>? contacts,
+    ContactSyncStatus? contactSyncStatus,
+    String? contactSyncError,
+    int? lastSyncedContactCount,
+    bool? isInitialized,
+    bool clearActiveSession = false,
   }) {
     return WhatsAppState(
       sessions: sessions ?? this.sessions,
-      activeSession: activeSession ?? this.activeSession,
+      activeSession: clearActiveSession ? null : (activeSession ?? this.activeSession),
       connectionState: connectionState ?? this.connectionState,
       error: error,
       isLoading: isLoading ?? this.isLoading,
@@ -237,6 +345,11 @@ class WhatsAppState {
       pairingCode: pairingCode,
       pairingPhoneNumber: pairingPhoneNumber,
       pairingError: pairingError,
+      contacts: contacts ?? this.contacts,
+      contactSyncStatus: contactSyncStatus ?? this.contactSyncStatus,
+      contactSyncError: contactSyncError,
+      lastSyncedContactCount: lastSyncedContactCount ?? this.lastSyncedContactCount,
+      isInitialized: isInitialized ?? this.isInitialized,
     );
   }
 }
@@ -417,68 +530,149 @@ class WhatsAppNotifier extends StateNotifier<WhatsAppState> {
     state = state.copyWith(connectionState: ConnectionState.disconnected);
   }
 
-  /// Load sessions from backend via REST API
+/// Load sessions from backend via REST API
+  /// Also loads sessions from local storage (for persistence)
   Future<void> loadSessions() async {
     try {
       state = state.copyWith(isLoading: true);
-      final response = await _apiClient.get<Map<String, dynamic>>('/openwa/sessions');
       
+      // First, try to load from backend
+      final response = await _apiClient.get<Map<String, dynamic>>('/openwa/sessions');
+
       if (response.data != null && response.data!['sessions'] != null) {
         final sessionsList = (response.data!['sessions'] as List)
             .map((s) => WhatsAppSession.fromJson(s as Map<String, dynamic>))
             .toList();
+
+        // Update state with sessions from backend
+        final updatedSessions = _mergeSessions(state.sessions, sessionsList);
         
         state = state.copyWith(
-          sessions: sessionsList,
+          sessions: updatedSessions,
           isLoading: false,
+          isInitialized: true,
         );
-        
+
         // Set first session as active if none set
-        if (state.activeSession == null && sessionsList.isNotEmpty) {
-          state = state.copyWith(activeSession: sessionsList.first);
+        if (state.activeSession == null && updatedSessions.isNotEmpty) {
+          // Prefer CONNECTED session, then any session with status
+          final connectedSession = updatedSessions.firstWhere(
+            (s) => s.status == WhatsAppStatus.connected,
+            orElse: () => updatedSessions.first,
+          );
+          state = state.copyWith(activeSession: connectedSession);
         }
       } else {
-        state = state.copyWith(isLoading: false);
+        // No backend sessions, use cached sessions
+        state = state.copyWith(
+          isLoading: false,
+          isInitialized: true,
+        );
       }
     } on DioException catch (e) {
+      developer.log('[WhatsAppProvider] loadSessions DioException: ${e.type}, ${e.message}', name: 'Session');
+      // On error, keep existing sessions (from cache/local storage)
       state = state.copyWith(
         isLoading: false,
-        error: e.message ?? 'Failed to load sessions',
+        isInitialized: true,
+        error: e.message ?? 'Failed to load sessions from server',
       );
     } catch (e) {
+      developer.log('[WhatsAppProvider] loadSessions Exception: $e', name: 'Session');
       state = state.copyWith(
         isLoading: false,
+        isInitialized: true,
         error: 'Failed to load sessions: $e',
       );
     }
   }
 
+  /// Merge backend sessions with local sessions (prefer backend for status)
+  List<WhatsAppSession> _mergeSessions(
+    List<WhatsAppSession> localSessions,
+    List<WhatsAppSession> backendSessions,
+  ) {
+    final merged = <String, WhatsAppSession>{};
+    
+    // Add backend sessions first (authoritative)
+    for (final session in backendSessions) {
+      merged[session.sessionId] = session;
+    }
+    
+    // Merge local session data (name, etc.) into backend sessions
+    for (final localSession in localSessions) {
+      if (merged.containsKey(localSession.sessionId)) {
+        final backendSession = merged[localSession.sessionId]!;
+        // Preserve name from local if backend doesn't have it
+        if (backendSession.name == null && localSession.name != null) {
+          merged[localSession.sessionId] = backendSession.copyWith(
+            name: localSession.name,
+            lastSyncAt: localSession.lastSyncAt,
+          );
+        }
+      } else {
+        // Local session not in backend - it may have been deleted
+        // Only keep if it's a new session we're still creating
+        if (localSession.status == WhatsAppStatus.connecting ||
+            localSession.status == WhatsAppStatus.waitingForQr ||
+            localSession.status == WhatsAppStatus.qrReady) {
+          merged[localSession.sessionId] = localSession;
+        }
+      }
+    }
+    
+    return merged.values.toList();
+  }
+
+  /// Generate a session name - use provided name or generate sequential name
+  String _generateSessionName(String? providedName) {
+    if (providedName != null && providedName.trim().isNotEmpty) {
+      return providedName.trim();
+    }
+    
+    // Generate sequential name: Session 1, Session 2, etc.
+    int sessionNumber = 1;
+    final existingNames = state.sessions
+        .where((s) => s.name != null && s.name!.startsWith('Session '))
+        .map((s) => s.name!)
+        .toList();
+    
+    while (existingNames.contains('Session $sessionNumber')) {
+      sessionNumber++;
+    }
+    
+    return 'Session $sessionNumber';
+  }
+
   /// Create a new WhatsApp session via REST API
   /// This calls the backend which creates the session in OpenWA and returns the QR code
+  /// [name] - Optional user-friendly name for the session
   Future<WhatsAppSession?> createSession({String? name}) async {
     try {
       state = state.copyWith(isLoading: true, error: null);
-      
-      final sessionName = name ?? 'wa-${DateTime.now().millisecondsSinceEpoch}';
-      
+
+      // Use provided name or generate sequential name
+      final sessionName = _generateSessionName(name);
+
       final response = await _apiClient.post<Map<String, dynamic>>(
         '/openwa/sessions',
         data: {'name': sessionName},
       );
-      
+
       if (response.data != null) {
         // The backend returns the session with QR code already
         final sessionId = response.data!['id'] ?? response.data!['sessionId'] ?? sessionName;
         final qr = response.data!['qr'] as String?;
         final status = response.data!['status'] as String? ?? 'QR_READY';
-        
+
         // Create a session object from the response
         final session = WhatsAppSession(
           sessionId: sessionId.toString(),
+          name: sessionName,
           status: WhatsAppSession.parseStatus(status),
           qrCode: qr,
         );
-        
+
         // Add to sessions list
         final sessions = List<WhatsAppSession>.from(state.sessions)..add(session);
         state = state.copyWith(
@@ -486,12 +680,15 @@ class WhatsAppNotifier extends StateNotifier<WhatsAppState> {
           activeSession: session,
           isLoading: false, // Stop loading immediately after getting QR
         );
-        
+
         developer.log('[WhatsAppProvider] createSession: Session created with QR: ${qr != null}', name: 'Session');
-        
+
+        // Start polling for QR status to detect when connected
+        _startQrPolling(session.sessionId);
+
         return session;
       }
-      
+
       state = state.copyWith(isLoading: false, error: 'No data returned from server');
       return null;
     } on DioException catch (e) {
@@ -774,6 +971,249 @@ class WhatsAppNotifier extends StateNotifier<WhatsAppState> {
   void clearError() {
     state = state.copyWith(error: null);
   }
+
+
+  // =====================================================
+  // QR POLLING - For handling QR code connection
+  // =====================================================
+
+  Timer? _qrPollTimer;
+  static const int _qrPollTimeout = 120; // 2 minutes timeout
+  int _qrPollElapsed = 0;
+
+  /// Start polling for QR session status to detect connection
+  void _startQrPolling(String sessionId) {
+    developer.log('[WhatsAppProvider] Starting QR polling for session: $sessionId', name: 'QR');
+    
+    _stopQrPolling();
+    _qrPollElapsed = 0;
+    
+    _qrPollTimer = Timer.periodic(const Duration(seconds: 3), (timer) async {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      
+      _qrPollElapsed += 3;
+      
+      // Check if already connected
+      final session = state.sessions.firstWhere(
+        (s) => s.sessionId == sessionId,
+        orElse: () => WhatsAppSession(sessionId: sessionId, status: WhatsAppStatus.disconnected),
+      );
+      
+      if (session.status == WhatsAppStatus.connected) {
+        developer.log('[WhatsAppProvider] QR session connected! Stopping polling.', name: 'QR');
+        _stopQrPolling();
+        _onSessionConnected(sessionId, session.phone);
+        return;
+      }
+      
+      // Check for timeout
+      if (_qrPollElapsed >= _qrPollTimeout) {
+        developer.log('[WhatsAppProvider] QR polling timeout', name: 'QR');
+        _stopQrPolling();
+        state = state.copyWith(
+          error: 'QR code expired. Please try again.',
+        );
+        return;
+      }
+      
+      // Poll backend for current status
+      try {
+        final response = await _apiClient.get<Map<String, dynamic>>(
+          '/openwa/sessions/$sessionId/status',
+        );
+        
+        if (response.data != null) {
+          final stateStr = response.data!['state'] as String? ?? 'DISCONNECTED';
+          final phone = response.data!['phone'] as String?;
+          final qr = response.data!['qr'] as String?;
+          final status = WhatsAppSession.parseStatus(stateStr);
+          
+          // Update session in list
+          final index = state.sessions.indexWhere((s) => s.sessionId == sessionId);
+          if (index >= 0) {
+            final sessions = List<WhatsAppSession>.from(state.sessions);
+            sessions[index] = sessions[index].copyWith(
+              status: status,
+              phone: phone,
+              qrCode: qr,
+            );
+            state = state.copyWith(sessions: sessions);
+            
+            // Check if connected now
+            if (status == WhatsAppStatus.connected) {
+              developer.log('[WhatsAppProvider] Session connected via polling!', name: 'QR');
+              _stopQrPolling();
+              _onSessionConnected(sessionId, phone);
+            }
+          }
+        }
+      } catch (e) {
+        developer.log('[WhatsAppProvider] QR polling error: $e', name: 'QR');
+      }
+    });
+  }
+
+  void _stopQrPolling() {
+    _qrPollTimer?.cancel();
+    _qrPollTimer = null;
+    _qrPollElapsed = 0;
+  }
+
+  /// Called when a session becomes connected
+  void _onSessionConnected(String sessionId, String? phone) {
+    // Update session to connected
+    final index = state.sessions.indexWhere((s) => s.sessionId == sessionId);
+    if (index >= 0) {
+      final sessions = List<WhatsAppSession>.from(state.sessions);
+      sessions[index] = sessions[index].copyWith(
+        status: WhatsAppStatus.connected,
+        phone: phone,
+        qrCode: null, // Clear QR code
+        lastActivity: DateTime.now(),
+      );
+      state = state.copyWith(
+        sessions: sessions,
+        activeSession: sessions[index],
+        connectionState: ConnectionState.connected,
+      );
+    }
+    
+    // Trigger automatic contact sync
+    _autoSyncContacts(sessionId);
+  }
+
+  /// Auto-sync contacts when session becomes connected
+  Future<void> _autoSyncContacts(String sessionId) async {
+    developer.log('[WhatsAppProvider] Auto-syncing contacts for session: $sessionId', name: 'Contacts');
+    
+    final index = state.sessions.indexWhere((s) => s.sessionId == sessionId);
+    if (index < 0) return;
+    
+    // Don't auto-sync if already synced recently (within 5 minutes)
+    final session = state.sessions[index];
+    if (session.lastSyncAt != null) {
+      final timeSinceLastSync = DateTime.now().difference(session.lastSyncAt!);
+      if (timeSinceLastSync.inMinutes < 5) {
+        developer.log('[WhatsAppProvider] Skipping auto-sync, synced recently', name: 'Contacts');
+        return;
+      }
+    }
+    
+    await syncContacts(sessionId);
+  }
+
+  // =====================================================
+  // CONTACT SYNCHRONIZATION
+  // =====================================================
+
+  /// Sync contacts for a session
+  Future<bool> syncContacts(String sessionId) async {
+    developer.log('[WhatsAppProvider] Starting contact sync for session: $sessionId', name: 'Contacts');
+    
+    final session = state.sessions.firstWhere(
+      (s) => s.sessionId == sessionId,
+      orElse: () => WhatsAppSession(sessionId: sessionId, status: WhatsAppStatus.disconnected),
+    );
+    
+    if (session.status != WhatsAppStatus.connected) {
+      state = state.copyWith(
+        contactSyncStatus: ContactSyncStatus.failed,
+        contactSyncError: 'Session not connected',
+      );
+      return false;
+    }
+    
+    state = state.copyWith(
+      contactSyncStatus: ContactSyncStatus.syncing,
+      contactSyncError: null,
+    );
+    
+    try {
+      // Get contacts from backend
+      final response = await _apiClient.get<Map<String, dynamic>>(
+        '/openwa/sessions/$sessionId/contacts',
+      );
+      
+      if (response.data != null && response.data!['contacts'] != null) {
+        final contactsList = (response.data!['contacts'] as List)
+            .map((c) => WhatsAppContact.fromJson(c as Map<String, dynamic>))
+            .toList();
+        
+        // Update state with contacts
+        state = state.copyWith(
+          contacts: contactsList,
+          contactSyncStatus: ContactSyncStatus.completed,
+          lastSyncedContactCount: contactsList.length,
+        );
+        
+        // Update session's last sync timestamp
+        final index = state.sessions.indexWhere((s) => s.sessionId == sessionId);
+        if (index >= 0) {
+          final sessions = List<WhatsAppSession>.from(state.sessions);
+          sessions[index] = sessions[index].copyWith(lastSyncAt: DateTime.now());
+          state = state.copyWith(sessions: sessions);
+        }
+        
+        developer.log('[WhatsAppProvider] Contact sync completed: ${contactsList.length} contacts', name: 'Contacts');
+        return true;
+      }
+      
+      state = state.copyWith(
+        contactSyncStatus: ContactSyncStatus.failed,
+        contactSyncError: 'No contacts returned',
+      );
+      return false;
+    } on DioException catch (e) {
+      developer.log('[WhatsAppProvider] Contact sync failed: ${e.message}', name: 'Contacts');
+      state = state.copyWith(
+        contactSyncStatus: ContactSyncStatus.failed,
+        contactSyncError: e.message ?? 'Failed to sync contacts',
+      );
+      return false;
+    } catch (e) {
+      developer.log('[WhatsAppProvider] Contact sync error: $e', name: 'Contacts');
+      state = state.copyWith(
+        contactSyncStatus: ContactSyncStatus.failed,
+        contactSyncError: 'Failed to sync contacts: $e',
+      );
+      return false;
+    }
+  }
+
+  // =====================================================
+  // STATE RESET
+  // =====================================================
+
+  /// Reset all state - use after logout, delete, or when user wants fresh start
+  void resetState() {
+    developer.log('[WhatsAppProvider] Resetting state', name: 'State');
+    
+    // Stop all polling
+    _statusPollTimer?.cancel();
+    _statusPollTimer = null;
+    _phonePairingPollTimer?.cancel();
+    _phonePairingPollTimer = null;
+    _qrPollTimer?.cancel();
+    _qrPollTimer = null;
+    
+    // Reset to initial state
+    state = WhatsAppState(
+      sessions: [],
+      activeSession: null,
+      connectionState: ConnectionState.disconnected,
+      error: null,
+      isLoading: false,
+      serverHealthy: state.serverHealthy,
+      phonePairingStatus: PhonePairingStatus.idle,
+      contacts: [],
+      contactSyncStatus: ContactSyncStatus.idle,
+      isInitialized: state.isInitialized,
+    );
+  }
+
 
   // =====================================================
   // PHONE PAIRING FLOW

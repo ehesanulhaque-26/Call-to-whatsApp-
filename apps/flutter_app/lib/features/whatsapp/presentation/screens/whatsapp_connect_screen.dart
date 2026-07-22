@@ -734,64 +734,88 @@ class _WhatsAppConnectScreenState extends ConsumerState<WhatsAppConnectScreen>
             textAlign: TextAlign.center,
           ),
           
-          const SizedBox(height: AppSpacing.lg),
+          const SizedBox(height: AppSpacing.md),
           
-          // Pairing Code Card
-          GestureDetector(
-            onTap: () => _copyPairingCode(pairingCode),
-            child: Card(
-              elevation: 4,
-              shadowColor: AppColors.primary.withOpacity(0.3),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(AppRadius.xl),
-              ),
-              child: Container(
-                padding: const EdgeInsets.all(AppSpacing.xl),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      AppColors.primary.withOpacity(0.05),
-                      AppColors.primary.withOpacity(0.1),
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(AppRadius.xl),
-                ),
-                child: Column(
-                  children: [
-                    // Pairing Code
-                    Text(
-                      pairingCode,
-                      style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 4,
-                        color: AppColors.primary,
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-                    // Copy hint
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.copy,
-                          size: 16,
-                          color: AppColors.textSecondary,
-                        ),
-                        const SizedBox(width: AppSpacing.xs),
-                        Text(
-                          'Tap to copy',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
+          Text(
+            'Enter this code in WhatsApp to link your account',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: AppColors.textSecondary,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          
+          const SizedBox(height: AppSpacing.xl),
+          
+          // Pairing Code Card - Large display
+          Card(
+            elevation: 4,
+            shadowColor: AppColors.primary.withOpacity(0.3),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppRadius.xl),
+            ),
+            child: Container(
+              padding: const EdgeInsets.all(AppSpacing.xl),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    AppColors.primary.withOpacity(0.05),
+                    AppColors.primary.withOpacity(0.1),
                   ],
                 ),
+                borderRadius: BorderRadius.circular(AppRadius.xl),
+              ),
+              child: Column(
+                children: [
+                  // Pairing Code - Large display
+                  Text(
+                    pairingCode,
+                    style: Theme.of(context).textTheme.displayMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 8,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ],
               ),
             ),
+          ),
+          
+          const SizedBox(height: AppSpacing.lg),
+          
+          // Action Buttons Row
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => _copyPairingCode(pairingCode),
+                  icon: const Icon(Icons.copy, size: 18),
+                  label: const Text('Copy Code'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+                  ),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    // Regenerate pairing code
+                    ref.read(whatsAppProvider.notifier).cancelPhonePairing();
+                    final phoneNumber = ref.read(whatsAppProvider).pairingPhoneNumber;
+                    if (phoneNumber != null) {
+                      ref.read(whatsAppProvider.notifier).startPhonePairing(phoneNumber);
+                    }
+                  },
+                  icon: const Icon(Icons.refresh, size: 18),
+                  label: const Text('Regenerate'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+                  ),
+                ),
+              ),
+            ],
           ),
           
           const SizedBox(height: AppSpacing.xxl),
@@ -804,24 +828,37 @@ class _WhatsAppConnectScreenState extends ConsumerState<WhatsAppConnectScreen>
               borderRadius: BorderRadius.circular(AppRadius.xl),
             ),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Text(
+                  'How to pair:',
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
                 _InstructionRow(
                   number: '1',
                   text: 'Open WhatsApp on your phone',
                 ),
-                const SizedBox(height: AppSpacing.md),
+                const SizedBox(height: AppSpacing.sm),
                 _InstructionRow(
                   number: '2',
-                  text: 'Go to Settings > Linked Devices',
+                  text: 'Tap Settings > Linked Devices',
                 ),
-                const SizedBox(height: AppSpacing.md),
+                const SizedBox(height: AppSpacing.sm),
                 _InstructionRow(
                   number: '3',
                   text: 'Tap "Link a Device"',
                 ),
-                const SizedBox(height: AppSpacing.md),
+                const SizedBox(height: AppSpacing.sm),
                 _InstructionRow(
                   number: '4',
+                  text: 'Tap "Link with phone number instead"',
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                _InstructionRow(
+                  number: '5',
                   text: 'Enter the pairing code above',
                 ),
               ],
@@ -843,7 +880,7 @@ class _WhatsAppConnectScreenState extends ConsumerState<WhatsAppConnectScreen>
                 const SizedBox(width: AppSpacing.sm),
                 Expanded(
                   child: Text(
-                    'This code expires shortly. Complete pairing quickly.',
+                    'This code expires in 60 seconds. Complete pairing quickly.',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: AppColors.warning,
                     ),
@@ -856,9 +893,12 @@ class _WhatsAppConnectScreenState extends ConsumerState<WhatsAppConnectScreen>
           const SizedBox(height: AppSpacing.xxl),
           
           // Cancel Button
-          TextButton(
-            onPressed: _onCancelPairing,
-            child: const Text('Cancel'),
+          SizedBox(
+            width: double.infinity,
+            child: TextButton(
+              onPressed: _onCancelPairing,
+              child: const Text('Cancel'),
+            ),
           ),
           
           const SizedBox(height: AppSpacing.xxl),

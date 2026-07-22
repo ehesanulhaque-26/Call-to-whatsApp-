@@ -860,6 +860,142 @@ export class SessionManagerService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  /**
+   * Load sessions from Supabase database for a specific user
+   * Called when user logs in to restore their sessions
+   */
+  async loadSessionsFromDb(userId: string): Promise<OpenWAClient[]> {
+    this.logger.log(`[SessionManager] Loading sessions from DB for user: ${userId}`);
+    
+    try {
+      const { data: sessions, error } = await this.supabaseService.query<Record<string, unknown>>('sessions', {
+        select: '*',
+        eq: { user_id: userId },
+        order: [{ column: 'created_at', ascending: false }],
+      });
+
+      if (error || !sessions) {
+        this.logger.error(`[SessionManager] Failed to load sessions from DB: ${error?.message}`);
+        return [];
+      }
+
+      const loadedClients: OpenWAClient[] = [];
+      
+      for (const dbSession of sessions) {
+        try {
+          const client = this.createClient();
+          const sessionId = (dbSession.id as string) || (dbSession.name as string);
+          const openWAClient: OpenWAClient = {
+            sessionId: sessionId,
+            userId: dbSession.user_id as string,
+            status: this.mapDbStatusToSession(dbSession.status as string),
+            phone: dbSession.phone as string | undefined,
+            deviceName: dbSession.device_name as string | undefined,
+            messageCount: (dbSession.message_count as number) || 0,
+            lastActivity: dbSession.last_message_at ? new Date(dbSession.last_message_at as string) : undefined,
+            client,
+          };
+          
+          this.clients.set(openWAClient.sessionId, openWAClient);
+          
+          const userSessionIds = this.userSessions.get(userId) || [];
+          if (!userSessionIds.includes(openWAClient.sessionId)) {
+            userSessionIds.push(openWAClient.sessionId);
+            this.userSessions.set(userId, userSessionIds);
+          }
+          
+          loadedClients.push(openWAClient);
+          this.logger.log(`[SessionManager] Loaded session from DB: ${openWAClient.sessionId}`);
+        } catch (error) {
+          this.logger.error(`[SessionManager] Failed to load session ${dbSession.id}`, error);
+        }
+      }
+
+      this.logger.log(`[SessionManager] Loaded ${loadedClients.length} sessions from DB for user ${userId}`);
+      return loadedClients;
+    } catch (error) {
+      this.logger.error(`[SessionManager] Error loading sessions from DB:`, error);
+      return [];
+    }
+  }
+
+  /**
+   * Map database status to SessionStatus enum
+   */
+  private mapDbStatusToSession(dbStatus: string): SessionStatus {
+    switch (dbStatus) {
+      case 'connected':
+        return SessionStatus.CONNECTED;
+      case 'pending':
+        return SessionStatus.CREATING;
+      case 'error':
+        return SessionStatus.FAILED;
+      case 'disconnected':
+      default:
+        return SessionStatus.DISCONNECTED;
+    }
+  }
+
+  /**
+   * Persist contacts to Supabase database
+   * Performs incremental sync - inserts new contacts, updates existing ones
+   */
+  async persistContacts(
+    sessionId: string,
+    userId: string,
+    contacts: Array<Record<string, unknown>>,
+  ): Promise<{ synced: number }> {
+    this.logger.log(`[SessionManager] Persisting ${contacts.length} contacts for session ${sessionId}`);
+    
+    try {
+      let syncedCount = 0;
+      
+      for (const contact of contacts) {
+        try {
+          const phone = (contact.phone || contact.id || '') as string;
+          if (!phone) continue;
+          
+          // Check if contact exists
+          const { data: existing } = await this.supabaseService.query<{ id: string }>('contacts', {
+            select: 'id',
+            eq: { user_id: userId, phone: phone },
+          });
+
+          if (existing && existing.length > 0) {
+            // Update existing contact
+            await this.supabaseService.update('contacts', existing[0].id, {
+              name: (contact.name as string) || null,
+              push_name: (contact.pushName as string) || (contact.push_name as string) || null,
+              profile_picture_url: (contact.profilePictureUrl as string) || (contact.profile_picture_url as string) || null,
+              is_business: (contact.isBusiness as boolean) || (contact.is_business as boolean) || false,
+              updated_at: new Date().toISOString(),
+            });
+          } else {
+            // Insert new contact
+            await this.supabaseService.insert('contacts', {
+              user_id: userId,
+              session_id: sessionId,
+              phone: phone,
+              name: (contact.name as string) || null,
+              push_name: (contact.pushName as string) || (contact.push_name as string) || null,
+              profile_picture_url: (contact.profilePictureUrl as string) || (contact.profile_picture_url as string) || null,
+              is_business: (contact.isBusiness as boolean) || (contact.is_business as boolean) || false,
+            });
+          }
+          syncedCount++;
+        } catch (contactError) {
+          this.logger.warn(`[SessionManager] Failed to persist contact: ${contactError}`);
+        }
+      }
+
+      this.logger.log(`[SessionManager] Persisted ${syncedCount} contacts for session ${sessionId}`);
+      return { synced: syncedCount };
+    } catch (error) {
+      this.logger.error(`[SessionManager] Failed to persist contacts:`, error);
+      return { synced: 0 };
+    }
+  }
+
   async sendTextMessage(
     sessionId: string,
     userId: string,
@@ -971,11 +1107,20 @@ export class SessionManagerService implements OnModuleInit, OnModuleDestroy {
         'GET',
         `/api/sessions/${sessionId}/contacts`,
       );
+      
+      const contacts = response.contacts || [];
+      
+      // Persist contacts to database
+      if (contacts.length > 0) {
+        const persistResult = await this.persistContacts(sessionId, userId, contacts);
+        this.logger.log(`[SessionManager] Persisted ${persistResult.synced} contacts to DB`);
+      }
+      
       this.emitEvent(sessionId, userId, SessionStatus.READY, {
         type: 'contact_sync_complete',
-        count: response.contacts?.length || 0,
+        count: contacts.length,
       });
-      return { synced: response.contacts?.length || 0 };
+      return { synced: contacts.length };
     } catch (error) {
       this.logger.error(`Failed to sync contacts: ${sessionId}`, error);
       throw error;

@@ -42,10 +42,18 @@ export class SessionManagerController {
   @ApiOperation({ summary: 'Get all sessions for current user' })
   @ApiResponse({ status: 200, description: 'User sessions' })
   async getSessions(@Req() req: AuthenticatedRequest) {
+    // First, try to load sessions from DB if not already loaded
+    const existingSessions = this.sessionManager.getUserSessions(req.user.userId);
+    if (existingSessions.length === 0) {
+      // Load from database
+      await this.sessionManager.loadSessionsFromDb(req.user.userId);
+    }
+    
     const sessions = this.sessionManager.getUserSessions(req.user.userId);
     return {
       sessions: sessions.map((s) => ({
         sessionId: s.sessionId,
+        name: s.deviceName || s.sessionId,
         status: s.status,
         phone: s.phone,
         deviceName: s.deviceName,

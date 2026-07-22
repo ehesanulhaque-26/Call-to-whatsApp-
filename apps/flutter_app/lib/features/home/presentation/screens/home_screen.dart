@@ -451,20 +451,21 @@ class HomeScreen extends ConsumerWidget {
               description: 'Manage your WhatsApp connection',
               onTap: () => context.go(AppRoutes.sessions),
             ),
-            const SizedBox(height: AppSpacing.sm),
-            const _FeatureCard(
-              icon: Icons.auto_awesome,
-              title: 'Automations',
-              description: 'Create automated message workflows',
-              isComing: true,
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            const _FeatureCard(
-              icon: Icons.campaign,
-              title: 'Campaigns',
-              description: 'Send bulk messages to contacts',
-              isComing: true,
-            ),
+            // Show Sync Contacts when connected
+            if (whatsAppState.isConnected) ...[
+              const SizedBox(height: AppSpacing.sm),
+              _SyncContactsCard(
+                syncStatus: whatsAppState.contactSyncStatus,
+                lastSyncedCount: whatsAppState.lastSyncedContactCount,
+                onSync: () {
+                  final activeSession = whatsAppState.activeSession;
+                  if (activeSession != null) {
+                    ref.read(whatsAppProvider.notifier).syncContacts(activeSession.sessionId);
+                  }
+                },
+              ),
+            ],
+            const SizedBox(height: AppSpacing.lg),
             Text(
               'Coming Soon',
               style: AppTypography.titleMedium.copyWith(
@@ -637,6 +638,108 @@ class _FeatureCard extends StatelessWidget {
             : onTap != null
                 ? const Icon(Icons.chevron_right, color: AppColors.textTertiary)
                 : null,
+      ),
+    );
+  }
+}
+
+/// Sync Contacts Card - Shows sync status and allows manual refresh
+class _SyncContactsCard extends StatelessWidget {
+  const _SyncContactsCard({
+    required this.syncStatus,
+    required this.lastSyncedCount,
+    required this.onSync,
+  });
+
+  final ContactSyncStatus syncStatus;
+  final int? lastSyncedCount;
+  final VoidCallback onSync;
+
+  @override
+  Widget build(BuildContext context) {
+    final isSyncing = syncStatus == ContactSyncStatus.syncing;
+    
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: AppColors.success.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(AppRadius.md),
+              ),
+              child: Icon(
+                Icons.sync,
+                color: AppColors.success,
+              ),
+            ),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Sync Contacts',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 2),
+                  _buildSyncStatusText(context),
+                ],
+              ),
+            ),
+            if (isSyncing)
+              const SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            else
+              IconButton(
+                icon: const Icon(Icons.refresh, color: AppColors.primary),
+                onPressed: onSync,
+                tooltip: 'Refresh contacts',
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSyncStatusText(BuildContext context) {
+    if (syncStatus == ContactSyncStatus.syncing) {
+      return Text(
+        'Syncing...',
+        style: AppTypography.bodySmall.copyWith(
+          color: AppColors.textSecondary,
+        ),
+      );
+    }
+    
+    if (syncStatus == ContactSyncStatus.completed && lastSyncedCount != null) {
+      return Text(
+        '$lastSyncedCount contacts synced',
+        style: AppTypography.bodySmall.copyWith(
+          color: AppColors.success,
+        ),
+      );
+    }
+    
+    if (syncStatus == ContactSyncStatus.failed) {
+      return Text(
+        'Sync failed - tap to retry',
+        style: AppTypography.bodySmall.copyWith(
+          color: AppColors.error,
+        ),
+      );
+    }
+    
+    return Text(
+      'Tap to sync your contacts',
+      style: AppTypography.bodySmall.copyWith(
+        color: AppColors.textSecondary,
       ),
     );
   }
