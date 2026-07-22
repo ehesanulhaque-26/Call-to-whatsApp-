@@ -7,11 +7,12 @@ import '../../../whatsapp/presentation/providers/whatsapp_provider.dart';
 
 /// Auth notifier for managing authentication state using Supabase Auth
 class AuthNotifier extends StateNotifier<AuthState> {
-  AuthNotifier(this._repository, this._supabaseService)
+  AuthNotifier(this._repository, this._supabaseService, this._ref)
       : super(const AuthState());
 
   final AuthRepository _repository;
   final SupabaseService _supabaseService;
+  final Ref _ref;
 
   /// Check authentication status - fetches profile from Supabase
   Future<void> checkAuthStatus() async {
@@ -164,11 +165,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
     developer.log('[AuthNotifier] LOGOUT: Starting', name: 'Auth');
     state = state.copyWith(isLoading: true);
 
-    // Disconnect WebSocket first
+    // Disconnect WebSocket first using the ref
     try {
-      // Get the WhatsApp provider and disconnect
-      // This ensures WebSocket is properly closed before auth logout
-      final whatsappNotifier = ref.read(whatsAppProvider.notifier);
+      // Use _ref.read to access the WhatsApp provider
+      // We use read (not watch) because we're calling an action, not reading state
+      final whatsappNotifier = _ref.read(whatsAppProvider.notifier);
       whatsappNotifier.disconnect();
       developer.log('[AuthNotifier] LOGOUT: WebSocket disconnected', name: 'Auth');
     } catch (e) {
@@ -186,7 +187,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
 final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
   final repository = ref.watch(authRepositoryProvider);
   final supabaseService = ref.watch(supabaseServiceProvider);
-  return AuthNotifier(repository, supabaseService);
+  return AuthNotifier(repository, supabaseService, ref);
 });
 
 /// Provider to check if current user is admin
