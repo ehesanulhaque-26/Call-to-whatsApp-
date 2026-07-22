@@ -1299,12 +1299,9 @@ class WhatsAppNotifier extends StateNotifier<WhatsAppState> {
         return;
       }
 
-      // Step 4: Poll for connection
-      state = state.copyWith(
-        phonePairingStatus: PhonePairingStatus.pairing,
-        pairingCode: pairingCode,
-      );
-
+      // Keep pairingCodeReady status so UI stays on code screen
+      // The pairing code is already stored by _requestPairingCode
+      
       developer.log('[WhatsAppProvider] Pairing code received: $pairingCode, waiting for connection...', name: 'PhonePairing');
 
       // Poll for connection - this will update state to connected when done

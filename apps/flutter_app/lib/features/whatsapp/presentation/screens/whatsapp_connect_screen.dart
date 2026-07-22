@@ -908,13 +908,20 @@ class _WhatsAppConnectScreenState extends ConsumerState<WhatsAppConnectScreen>
   }
 
   Widget _buildPairingProgressState(String? pairingCode) {
+    // If we have the code, show the full code display (same as pairingCodeReady state)
+    // This ensures the code is always visible with Copy button
+    if (pairingCode != null) {
+      return _buildPairingCodeState(pairingCode);
+    }
+
+    // Fallback for edge case where code is not available
     return SingleChildScrollView(
       padding: const EdgeInsets.all(AppSpacing.lg),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const SizedBox(height: AppSpacing.xxl),
-          
+
           // Animated Icon
           Container(
             width: 100,
@@ -942,9 +949,9 @@ class _WhatsAppConnectScreenState extends ConsumerState<WhatsAppConnectScreen>
               ],
             ),
           ),
-          
+
           const SizedBox(height: AppSpacing.xxl),
-          
+
           Text(
             'Waiting for approval...',
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
@@ -952,9 +959,9 @@ class _WhatsAppConnectScreenState extends ConsumerState<WhatsAppConnectScreen>
             ),
             textAlign: TextAlign.center,
           ),
-          
+
           const SizedBox(height: AppSpacing.md),
-          
+
           Text(
             'Check your WhatsApp app and enter the pairing code',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
@@ -962,39 +969,9 @@ class _WhatsAppConnectScreenState extends ConsumerState<WhatsAppConnectScreen>
             ),
             textAlign: TextAlign.center,
           ),
-          
-          if (pairingCode != null) ...[
-            const SizedBox(height: AppSpacing.xxl),
-            
-            // Pairing Code Reminder
-            Card(
-              elevation: 0,
-              color: AppColors.surfaceVariant.withOpacity(0.5),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(AppRadius.lg),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(AppSpacing.md),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.key, size: 20, color: AppColors.primary),
-                    const SizedBox(width: AppSpacing.sm),
-                    Text(
-                      'Code: $pairingCode',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.primary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-          
+
           const SizedBox(height: AppSpacing.xxl),
-          
+
           // Instructions
           Container(
             padding: const EdgeInsets.all(AppSpacing.lg),
@@ -1032,9 +1009,9 @@ class _WhatsAppConnectScreenState extends ConsumerState<WhatsAppConnectScreen>
               ],
             ),
           ),
-          
+
           const SizedBox(height: AppSpacing.xxl),
-          
+
           // Cancel Button
           TextButton(
             onPressed: _onCancelPairing,
@@ -1044,6 +1021,7 @@ class _WhatsAppConnectScreenState extends ConsumerState<WhatsAppConnectScreen>
       ),
     );
   }
+
 
   Widget _buildErrorState(String error) {
     return Center(
