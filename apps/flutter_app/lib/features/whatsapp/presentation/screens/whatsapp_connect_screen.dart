@@ -84,10 +84,50 @@ class _WhatsAppConnectScreenState extends ConsumerState<WhatsAppConnectScreen>
     // Reset navigation flag for new pairing
     _hasNavigated = false;
     
+    // Show session naming dialog first (matching QR flow UX)
+    final sessionName = await _showSessionNameDialog();
+    if (sessionName == null || sessionName.isEmpty) {
+      // User cancelled
+      return;
+    }
+    
     final phoneNumber = '$_countryCode${_phoneController.text}';
     
-    // Start the phone pairing flow
-    ref.read(whatsAppProvider.notifier).startPhonePairing(phoneNumber);
+    // Start the phone pairing flow with session name
+    ref.read(whatsAppProvider.notifier).startPhonePairing(phoneNumber, sessionName: sessionName);
+  }
+
+  /// Shows a dialog to get the session name (matches QR flow UX)
+  Future<String?> _showSessionNameDialog() async {
+    final controller = TextEditingController();
+    final result = await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text('Session Name'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(
+            labelText: 'Enter session name',
+            hintText: 'e.g., Marketing, Sales, Support',
+          ),
+          textCapitalization: TextCapitalization.words,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, ''),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, controller.text),
+            child: const Text('Create'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    return result;
   }
 
   Future<void> _onConnectWithQR() async {
@@ -216,21 +256,27 @@ class _WhatsAppConnectScreenState extends ConsumerState<WhatsAppConnectScreen>
       return _buildQrState(qrCode, sessionStatus);
     }
 
-    // Show pairing code state
-    if (status == PhonePairingStatus.pairingCodeReady && pairingCode != null) {
-      return _buildPairingCodeState(pairingCode);
+    // CRITICAL: If we have a pairing code, ALWAYS show it regardless of intermediate states
+    // This ensures the code stays visible until the session is fully connected
+    if (pairingCode != null) {
+      // If connected, show success
+      if (sessionStatus == WhatsAppStatus.connected) {
+        return _buildSuccessState();
+      }
+      // Otherwise show pairing code with connecting progress
+      return _buildPairingCodeWithProgressState(pairingCode, status);
     }
 
-    // Show pairing in progress state
-    if (status == PhonePairingStatus.pairing) {
-      return _buildPairingProgressState(pairingCode);
-    }
-
-    // Show loading states
+    // Show loading states when we don't have a code yet
     if (status == PhonePairingStatus.preparingSession ||
         status == PhonePairingStatus.sessionReady ||
         status == PhonePairingStatus.requestingPairingCode) {
       return _buildLoadingState(status, phoneNumber);
+    }
+
+    // Show pairing in progress state (no code available)
+    if (status == PhonePairingStatus.pairing) {
+      return _buildPairingProgressState(pairingCode);
     }
 
     // Show error state
@@ -912,6 +958,265 @@ class _WhatsAppConnectScreenState extends ConsumerState<WhatsAppConnectScreen>
           ),
           
           const SizedBox(height: AppSpacing.xxl),
+        ],
+      ),
+    );
+  }
+
+  /// Shows pairing code with a connecting progress indicator below it
+  /// The pairing code remains visible at all times until connected
+  Widget _buildPairingCodeWithProgressState(String pairingCode, PhonePairingStatus status) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const SizedBox(height: AppSpacing.xxl),
+          
+          // Phone Icon
+          Container(
+            width: 100,
+            height: 100,
+            decoration: BoxDecoration(
+              color: AppColors.primary.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.verified_user,
+              size: 50,
+              color: AppColors.primary,
+            ),
+          ),
+          
+          const SizedBox(height: AppSpacing.xxl),
+          
+          Text(
+            'Pairing Code',
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          
+          const SizedBox(height: AppSpacing.md),
+          
+          Text(
+            'Enter this code in WhatsApp to link your account',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: AppColors.textSecondary,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          
+          const SizedBox(height: AppSpacing.xl),
+          
+          // Pairing Code Card - Large display
+          Card(
+            elevation: 4,
+            shadowColor: AppColors.primary.withOpacity(0.3),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppRadius.xl),
+            ),
+            child: Container(
+              padding: const EdgeInsets.all(AppSpacing.xl),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    AppColors.primary.withOpacity(0.05),
+                    AppColors.primary.withOpacity(0.1),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(AppRadius.xl),
+              ),
+              child: Column(
+                children: [
+                  // Pairing Code - Large display
+                  Text(
+                    pairingCode,
+                    style: Theme.of(context).textTheme.displayMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 8,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          
+          const SizedBox(height: AppSpacing.lg),
+          
+          // Action Buttons Row
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => _copyPairingCode(pairingCode),
+                  icon: const Icon(Icons.copy, size: 18),
+                  label: const Text('Copy Code'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+                  ),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    // Regenerate pairing code
+                    ref.read(whatsAppProvider.notifier).cancelPhonePairing();
+                    final phoneNumber = ref.read(whatsAppProvider).pairingPhoneNumber;
+                    if (phoneNumber != null) {
+                      ref.read(whatsAppProvider.notifier).startPhonePairing(phoneNumber);
+                    }
+                  },
+                  icon: const Icon(Icons.refresh, size: 18),
+                  label: const Text('Regenerate'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          
+          const SizedBox(height: AppSpacing.xl),
+          
+          // Connecting Progress Indicator
+          _buildConnectingProgressIndicator(status),
+          
+          const SizedBox(height: AppSpacing.xl),
+          
+          // Instructions
+          Container(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            decoration: BoxDecoration(
+              color: AppColors.surfaceVariant.withOpacity(0.5),
+              borderRadius: BorderRadius.circular(AppRadius.xl),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'How to pair:',
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                _InstructionRow(
+                  number: '1',
+                  text: 'Open WhatsApp on your phone',
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                _InstructionRow(
+                  number: '2',
+                  text: 'Tap Settings > Linked Devices',
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                _InstructionRow(
+                  number: '3',
+                  text: 'Tap "Link a Device"',
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                _InstructionRow(
+                  number: '4',
+                  text: 'Tap "Link with phone number instead"',
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                _InstructionRow(
+                  number: '5',
+                  text: 'Enter the pairing code above',
+                ),
+              ],
+            ),
+          ),
+          
+          const SizedBox(height: AppSpacing.lg),
+          
+          // Cancel Button
+          SizedBox(
+            width: double.infinity,
+            child: TextButton(
+              onPressed: _onCancelPairing,
+              child: const Text('Cancel'),
+            ),
+          ),
+          
+          const SizedBox(height: AppSpacing.xxl),
+        ],
+      ),
+    );
+  }
+
+  /// Builds a connecting progress indicator based on the current pairing status
+  Widget _buildConnectingProgressIndicator(PhonePairingStatus status) {
+    String statusMessage;
+    bool isActive;
+    
+    switch (status) {
+      case PhonePairingStatus.pairingCodeReady:
+        statusMessage = 'Waiting for WhatsApp to connect...';
+        isActive = true;
+        break;
+      case PhonePairingStatus.pairing:
+        statusMessage = 'Connecting to WhatsApp...';
+        isActive = true;
+        break;
+      case PhonePairingStatus.preparingSession:
+        statusMessage = 'Preparing session...';
+        isActive = true;
+        break;
+      case PhonePairingStatus.sessionReady:
+        statusMessage = 'Session ready, connecting...';
+        isActive = true;
+        break;
+      case PhonePairingStatus.requestingPairingCode:
+        statusMessage = 'Sending pairing request...';
+        isActive = true;
+        break;
+      case PhonePairingStatus.idle:
+      case PhonePairingStatus.connected:
+      case PhonePairingStatus.failed:
+      default:
+        statusMessage = 'Waiting for connection...';
+        isActive = false;
+    }
+    
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: isActive ? AppColors.primary.withOpacity(0.1) : AppColors.surfaceVariant.withOpacity(0.5),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+      ),
+      child: Row(
+        children: [
+          if (isActive)
+            SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: AppColors.primary,
+              ),
+            )
+          else
+            const Icon(
+              Icons.hourglass_empty,
+              size: 20,
+              color: AppColors.textSecondary,
+            ),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Text(
+              statusMessage,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: isActive ? AppColors.primary : AppColors.textSecondary,
+              ),
+            ),
+          ),
         ],
       ),
     );

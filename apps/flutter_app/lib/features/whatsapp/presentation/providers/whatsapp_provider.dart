@@ -1158,8 +1158,8 @@ class WhatsAppNotifier extends StateNotifier<WhatsAppState> {
         '/openwa/sessions/$sessionId/contacts',
       );
       
-      if (response.data != null && response.data!['contacts'] != null) {
-        final contactsList = (response.data!['contacts'] as List)
+      if (response.data != null) {
+        final contactsList = (response.data is List ? response.data as List : response.data!['contacts'] as List)
             .map((c) => WhatsAppContact.fromJson(c as Map<String, dynamic>))
             .toList();
         
@@ -1248,7 +1248,7 @@ class WhatsAppNotifier extends StateNotifier<WhatsAppState> {
   /// 2. Waiting for session to be ready
   /// 3. Requesting the pairing code
   /// 4. Polling for connection status
-  Future<void> startPhonePairing(String phoneNumber) async {
+  Future<void> startPhonePairing(String phoneNumber, {String? sessionName}) async {
     developer.log('[WhatsAppProvider] Starting phone pairing for: $phoneNumber', name: 'PhonePairing');
 
     // Cancel any ongoing pairing
@@ -1264,7 +1264,7 @@ class WhatsAppNotifier extends StateNotifier<WhatsAppState> {
 
     try {
       // Step 1: Find or create a session
-      String? sessionId = await _findOrCreateSession();
+      String? sessionId = await _findOrCreateSession(sessionName: sessionName);
       
       if (sessionId == null) {
         developer.log('[WhatsAppProvider] Failed to create session', name: 'PhonePairing');
@@ -1317,7 +1317,7 @@ class WhatsAppNotifier extends StateNotifier<WhatsAppState> {
   }
 
   /// Find an existing healthy session or create a new one
-  Future<String?> _findOrCreateSession() async {
+  Future<String?> _findOrCreateSession({String? sessionName}) async {
     developer.log('[WhatsAppProvider] Finding or creating session...', name: 'PhonePairing');
 
     // Check for existing healthy sessions
@@ -1336,8 +1336,8 @@ class WhatsAppNotifier extends StateNotifier<WhatsAppState> {
     developer.log('[WhatsAppProvider] No healthy session found, creating new session...', name: 'PhonePairing');
     
     try {
-      // Use the createSession method
-      await createSession();
+      // Use the createSession method with the provided session name
+      await createSession(name: sessionName);
       
       // Wait a bit for the session to be created
       await Future.delayed(const Duration(milliseconds: 500));
@@ -1520,6 +1520,8 @@ class WhatsAppNotifier extends StateNotifier<WhatsAppState> {
           developer.log('[WhatsAppProvider] Polling status: $sessionState', name: 'PhonePairing');
 
           if (status == WhatsAppStatus.connected) {
+            // Call onSessionConnected to trigger auto-sync and other connected handlers
+            _onSessionConnected(sessionId, phone);
             developer.log('[WhatsAppProvider] Connected! Stopping polling.', name: 'PhonePairing');
             timer.cancel();
             state = state.copyWith(
