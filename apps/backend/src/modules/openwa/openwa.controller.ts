@@ -75,13 +75,15 @@ export class OpenWAController {
     this.cancelOngoingPolling();
 
     const sessionName = body?.name;
-    console.log(`[OpenWA Controller] CREATE SESSION - Extracted name: "${sessionName}"`);
+    console.log(`[OpenWA Controller] CREATE SESSION - User provided name: "${sessionName}"`);
 
     // Generate a name if not provided or invalid
     let finalName = sessionName;
     if (!finalName || finalName === 'undefined' || finalName === 'null') {
       finalName = `wa-${Date.now()}`;
-      console.log(`[OpenWA Controller] CREATE SESSION - Generated name: "${finalName}"`);
+      console.log(`[OpenWA Controller] CREATE SESSION - No name provided, generated: "${finalName}"`);
+    } else {
+      console.log(`[OpenWA Controller] CREATE SESSION - Using provided name: "${finalName}"`);
     }
 
     // Step 0: Check for existing sessions

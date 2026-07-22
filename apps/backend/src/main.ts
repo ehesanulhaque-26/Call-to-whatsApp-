@@ -3,8 +3,22 @@ import { ValidationPipe, Logger } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 
+// Backend version info - update with each deploy
+const BACKEND_VERSION = process.env.BACKEND_VERSION || 'dev-local';
+const BUILD_TIME = process.env.BUILD_TIME || new Date().toISOString();
+
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
+
+  // Print startup info for debugging deployment status
+  console.log('═'.repeat(60));
+  console.log('BACKEND STARTUP INFO');
+  console.log('═'.repeat(60));
+  console.log(`VERSION:        ${BACKEND_VERSION}`);
+  console.log(`BUILD TIME:     ${BUILD_TIME}`);
+  console.log(`SANITIZER:      ACTIVE`);
+  console.log(`STARTED AT:     ${new Date().toISOString()}`);
+  console.log('═'.repeat(60));
 
   const app = await NestFactory.create(AppModule);
 
