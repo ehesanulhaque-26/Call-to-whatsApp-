@@ -88,28 +88,40 @@ class WhatsAppSession {
   }
 
   /// Parse status string to WhatsAppStatus enum
+  /// Handles both UPPERCASE and lowercase status values from backend
   static WhatsAppStatus parseStatus(String status) {
-    switch (status.toLowerCase()) {
-      case 'created':
+    final normalizedStatus = status.toUpperCase();
+    switch (normalizedStatus) {
+      case 'NOT_CREATED':
+      case 'CREATING':
         return WhatsAppStatus.disconnected;
-      case 'loading':
+      case 'INITIALIZING':
+      case 'LOADING':
         return WhatsAppStatus.connecting;
-      case 'qr_generated':
-      case 'qrcode':
+      case 'QR_READY':
+      case 'QR_GENERATED':
+      case 'QRCODE':
         return WhatsAppStatus.waitingForQr;
-      case 'qr_updated':
+      case 'QR_UPDATED':
         return WhatsAppStatus.qrReady;
-      case 'authenticated':
+      case 'AUTHENTICATED':
+      case 'PAIRING_READY':
         return WhatsAppStatus.scanning;
-      case 'connected':
-      case 'ready':
+      case 'CONNECTING':
+        return WhatsAppStatus.connecting;
+      case 'CONNECTED':
+      case 'READY':
         return WhatsAppStatus.connected;
-      case 'disconnected':
+      case 'DISCONNECTED':
         return WhatsAppStatus.disconnected;
-      case 'reconnecting':
+      case 'RECONNECTING':
         return WhatsAppStatus.reconnecting;
-      case 'error':
+      case 'FAILED':
+      case 'ERROR':
         return WhatsAppStatus.error;
+      case 'LOGGED_OUT':
+      case 'DELETED':
+        return WhatsAppStatus.disconnected;
       default:
         return WhatsAppStatus.disconnected;
     }
@@ -442,41 +454,55 @@ class WhatsAppNotifier extends StateNotifier<WhatsAppState> {
   }
 
   /// Create a new WhatsApp session via REST API
+  /// This calls the backend which creates the session in OpenWA and returns the QR code
   Future<WhatsAppSession?> createSession({String? name}) async {
     try {
       state = state.copyWith(isLoading: true, error: null);
       
+      final sessionName = name ?? 'wa-${DateTime.now().millisecondsSinceEpoch}';
+      
       final response = await _apiClient.post<Map<String, dynamic>>(
         '/openwa/sessions',
-        data: {'name': name ?? 'wa-${DateTime.now().millisecondsSinceEpoch}'},
+        data: {'name': sessionName},
       );
       
       if (response.data != null) {
-        final session = WhatsAppSession.fromJson(response.data!);
+        // The backend returns the session with QR code already
+        final sessionId = response.data!['id'] ?? response.data!['sessionId'] ?? sessionName;
+        final qr = response.data!['qr'] as String?;
+        final status = response.data!['status'] as String? ?? 'QR_READY';
+        
+        // Create a session object from the response
+        final session = WhatsAppSession(
+          sessionId: sessionId.toString(),
+          status: WhatsAppSession.parseStatus(status),
+          qrCode: qr,
+        );
         
         // Add to sessions list
         final sessions = List<WhatsAppSession>.from(state.sessions)..add(session);
         state = state.copyWith(
           sessions: sessions,
           activeSession: session,
-          isLoading: false,
+          isLoading: false, // Stop loading immediately after getting QR
         );
         
-        // After creating session, fetch QR code
-        await getQRCode(session.sessionId);
+        developer.log('[WhatsAppProvider] createSession: Session created with QR: ${qr != null}', name: 'Session');
         
         return session;
       }
       
-      state = state.copyWith(isLoading: false);
+      state = state.copyWith(isLoading: false, error: 'No data returned from server');
       return null;
     } on DioException catch (e) {
+      developer.log('[WhatsAppProvider] createSession DioException: ${e.type}, ${e.message}', name: 'Session');
       state = state.copyWith(
         isLoading: false,
         error: e.message ?? 'Failed to create session',
       );
       return null;
     } catch (e) {
+      developer.log('[WhatsAppProvider] createSession Exception: $e', name: 'Session');
       state = state.copyWith(
         isLoading: false,
         error: 'Failed to create session: $e',
@@ -486,37 +512,29 @@ class WhatsAppNotifier extends StateNotifier<WhatsAppState> {
   }
 
   /// Get QR code for a session via REST API
+  /// Note: This endpoint returns QR from the backend's session state, not directly from OpenWA
   Future<String?> getQRCode(String sessionId) async {
     try {
-      state = state.copyWith(isLoading: true, error: null);
-      
       final response = await _apiClient.get<Map<String, dynamic>>(
-        '/openwa/sessions/$sessionId/qr',
+        '/openwa/sessions/$sessionId/status',
       );
       
-      if (response.data != null && response.data!['qr'] != null) {
-        final qr = response.data!['qr'] as String;
+      if (response.data != null) {
+        final qr = response.data!['qr'] as String?;
+        final state = response.data!['state'] as String? ?? 'DISCONNECTED';
         
-        // Update session with QR code
-        _updateSessionStatus(sessionId, WhatsAppStatus.qrReady, qrCode: qr);
+        // Update session with QR code and status
+        _updateSessionStatus(sessionId, WhatsAppSession.parseStatus(state), qrCode: qr);
         
-        state = state.copyWith(isLoading: false);
         return qr;
       }
       
-      state = state.copyWith(isLoading: false);
       return null;
     } on DioException catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: e.message ?? 'Failed to get QR code',
-      );
+      developer.log('[WhatsAppProvider] getQRCode DioException: ${e.type}', name: 'Session');
       return null;
     } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: 'Failed to get QR code: $e',
-      );
+      developer.log('[WhatsAppProvider] getQRCode Exception: $e', name: 'Session');
       return null;
     }
   }

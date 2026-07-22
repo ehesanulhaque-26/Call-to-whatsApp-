@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/services/supabase_service.dart';
 import '../../data/models/auth_state.dart';
 import '../../data/repositories/auth_repository.dart';
+import '../../../whatsapp/presentation/providers/whatsapp_provider.dart';
 
 /// Auth notifier for managing authentication state using Supabase Auth
 class AuthNotifier extends StateNotifier<AuthState> {
@@ -162,6 +163,17 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<void> logout() async {
     developer.log('[AuthNotifier] LOGOUT: Starting', name: 'Auth');
     state = state.copyWith(isLoading: true);
+
+    // Disconnect WebSocket first
+    try {
+      // Get the WhatsApp provider and disconnect
+      // This ensures WebSocket is properly closed before auth logout
+      final whatsappNotifier = ref.read(whatsAppProvider.notifier);
+      whatsappNotifier.disconnect();
+      developer.log('[AuthNotifier] LOGOUT: WebSocket disconnected', name: 'Auth');
+    } catch (e) {
+      developer.log('[AuthNotifier] LOGOUT: WebSocket disconnect error: $e', name: 'Auth');
+    }
 
     await _repository.logout();
 

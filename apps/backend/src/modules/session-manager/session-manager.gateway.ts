@@ -10,9 +10,10 @@ import {
 } from '@nestjs/websockets';
 import { Logger } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
-import { SessionManagerService, SessionEvent } from './session-manager.service';
+import { SessionManagerService } from './session-manager.service';
 import { SupabaseService } from '../supabase/supabase.service';
 import { OnEvent } from '@nestjs/event-emitter';
+import { SessionEvent as UnifiedSessionEvent, SessionStatus } from '../../common/types/session.types';
 
 interface AuthenticatedSocket extends Socket {
   userId?: string;
@@ -291,13 +292,40 @@ export class SessionManagerGateway
   }
 
   @OnEvent('session.event')
-  handleSessionEvent(event: SessionEvent): void {
+  handleSessionEvent(event: UnifiedSessionEvent): void {
     // Only send events to the user who owns the session
-    this.sendToUser(event.userId, event.event, {
+    const eventName = this.mapStatusToEventName(event.status);
+    this.sendToUser(event.userId, eventName, {
       sessionId: event.sessionId,
-      ...event.data,
+      phone: event.phone,
+      qr: event.qrCode,
+      error: event.error,
       timestamp: event.timestamp.toISOString(),
     });
+  }
+  
+  private mapStatusToEventName(status: SessionStatus): string {
+    switch (status) {
+      case SessionStatus.CREATING:
+        return 'session_loading';
+      case SessionStatus.QR_READY:
+        return 'qr_generated';
+      case SessionStatus.CONNECTING:
+        return 'reconnecting';
+      case SessionStatus.CONNECTED:
+      case SessionStatus.READY:
+        return 'connected';
+      case SessionStatus.DISCONNECTED:
+        return 'disconnected';
+      case SessionStatus.LOGGED_OUT:
+        return 'logged_out';
+      case SessionStatus.FAILED:
+        return 'error';
+      case SessionStatus.DELETED:
+        return 'destroyed';
+      default:
+        return 'session_event';
+    }
   }
 
   private sendToUser(userId: string, event: string, data: Record<string, unknown>): void {
@@ -322,9 +350,9 @@ export class SessionManagerGateway
     const allSessions = this.sessionManager.getAllSessions();
     const stats = {
       totalSessions: allSessions.length,
-      connectedSessions: allSessions.filter((s) => s.status === 'connected' || s.status === 'ready')
+      connectedSessions: allSessions.filter((s) => s.status === SessionStatus.CONNECTED || s.status === SessionStatus.READY)
         .length,
-      disconnectedSessions: allSessions.filter((s) => s.status === 'disconnected').length,
+      disconnectedSessions: allSessions.filter((s) => s.status === SessionStatus.DISCONNECTED).length,
       totalMessages: allSessions.reduce((sum, s) => sum + s.messageCount, 0),
       sessions: allSessions.map((s) => ({
         sessionId: s.sessionId,

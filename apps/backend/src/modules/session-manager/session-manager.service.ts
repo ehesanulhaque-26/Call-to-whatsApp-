@@ -5,6 +5,8 @@ import axios, { AxiosInstance, AxiosError } from 'axios';
 import * as fs from 'fs';
 import * as path from 'path';
 import { v4 as uuidv4 } from 'uuid';
+import { SessionStatus, normalizeOpenWAStatus, SessionEvent as UnifiedSessionEvent } from '../../common/types/session.types';
+import { SupabaseService } from '../supabase/supabase.service';
 
 export interface OpenWAClient {
   sessionId: string;
@@ -18,29 +20,6 @@ export interface OpenWAClient {
   client: AxiosInstance;
 }
 
-export enum SessionStatus {
-  CREATED = 'created',
-  LOADING = 'loading',
-  QR_GENERATED = 'qr_generated',
-  QR_UPDATED = 'qr_updated',
-  QR_EXPIRED = 'qr_expired',
-  AUTHENTICATED = 'authenticated',
-  CONNECTED = 'connected',
-  READY = 'ready',
-  DISCONNECTED = 'disconnected',
-  RECONNECTING = 'reconnecting',
-  DESTROYED = 'destroyed',
-  ERROR = 'error',
-}
-
-export interface SessionEvent {
-  sessionId: string;
-  userId: string;
-  event: SessionStatus;
-  data?: Record<string, unknown>;
-  timestamp: Date;
-}
-
 @Injectable()
 export class SessionManagerService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(SessionManagerService.name);
@@ -52,10 +31,12 @@ export class SessionManagerService implements OnModuleInit, OnModuleDestroy {
   private qrTimers: Map<string, NodeJS.Timeout> = new Map();
   private reconnectTimers: Map<string, NodeJS.Timeout> = new Map();
   private cleanupInterval: NodeJS.Timeout | null = null;
+  private statusPollingIntervals: Map<string, NodeJS.Timeout> = new Map();
 
   constructor(
     private readonly configService: ConfigService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly supabaseService: SupabaseService,
   ) {
     // Get OpenWA URL from config or environment
     // Use public Railway URL as fallback (same as OpenWAService)
@@ -92,12 +73,20 @@ export class SessionManagerService implements OnModuleInit, OnModuleDestroy {
     this.stopCleanupInterval();
     this.stopAllQrTimers();
     this.stopAllReconnectTimers();
+    this.stopAllStatusPolling();
     for (const [sessionId] of this.clients.entries()) {
       await this.saveSessionState(sessionId);
     }
     this.clients.clear();
     this.userSessions.clear();
     this.logger.log('Session Manager shutdown complete');
+  }
+  
+  private stopAllStatusPolling(): void {
+    for (const timer of this.statusPollingIntervals.values()) {
+      clearInterval(timer);
+    }
+    this.statusPollingIntervals.clear();
   }
 
   private startCleanupInterval(): void {
@@ -131,11 +120,13 @@ export class SessionManagerService implements OnModuleInit, OnModuleDestroy {
     const now = Date.now();
     const staleThreshold = 30 * 60 * 1000;
     for (const [sessionId, client] of this.clients.entries()) {
-      if (client.status === SessionStatus.DISCONNECTED) {
+      if (client.status === SessionStatus.DISCONNECTED || client.status === SessionStatus.FAILED) {
         const lastActivity = client.lastActivity?.getTime() || 0;
         if (now - lastActivity > staleThreshold) {
           this.logger.log(`Cleaning up stale session: ${sessionId}`);
-          this.emitEvent(sessionId, client.userId, SessionStatus.DESTROYED);
+          this.destroySession(sessionId, client.userId).catch(err => {
+            this.logger.error(`Failed to cleanup stale session: ${err}`);
+          });
         }
       }
     }
@@ -155,7 +146,15 @@ export class SessionManagerService implements OnModuleInit, OnModuleDestroy {
     event: SessionStatus,
     data?: Record<string, unknown>,
   ): void {
-    const sessionEvent: SessionEvent = { sessionId, userId, event, data, timestamp: new Date() };
+    const sessionEvent: UnifiedSessionEvent = { 
+      sessionId, 
+      userId, 
+      status: event, 
+      phone: data?.['phone'] as string | undefined,
+      qrCode: data?.['qr'] as string | undefined,
+      error: data?.['error'] as string | undefined,
+      timestamp: new Date() 
+    };
     this.eventEmitter.emit('session.event', sessionEvent);
     this.logger.debug(`Session event: ${sessionId} -> ${event}`);
   }
@@ -211,7 +210,7 @@ export class SessionManagerService implements OnModuleInit, OnModuleDestroy {
     const openWAClient: OpenWAClient = {
       sessionId,
       userId,
-      status: SessionStatus.CREATED,
+      status: SessionStatus.CREATING,
       messageCount: 0,
       client,
     };
@@ -219,15 +218,13 @@ export class SessionManagerService implements OnModuleInit, OnModuleDestroy {
     const userSessionIds = this.userSessions.get(userId) || [];
     userSessionIds.push(sessionId);
     this.userSessions.set(userId, userSessionIds);
-    this.emitEvent(sessionId, userId, SessionStatus.CREATED);
-    this.emitEvent(sessionId, userId, SessionStatus.LOADING);
-    try {
-      await this.request<{ sessionId: string }>(client, 'POST', '/api/sessions', { sessionId });
-      this.logger.log(`[SessionManager] Session ${sessionId} created in OpenWA`);
-    } catch (error) {
-      this.logger.error(`[SessionManager] Failed to create session in OpenWA: ${sessionId}`, error);
-      this.emitEvent(sessionId, userId, SessionStatus.ERROR, { error: 'Failed to create session' });
-    }
+    
+    // Emit event
+    this.emitEvent(sessionId, userId, SessionStatus.CREATING);
+    
+    // Persist to Supabase
+    await this.persistSessionToDb(sessionId, userId);
+    
     return openWAClient;
   }
 
@@ -236,36 +233,46 @@ export class SessionManagerService implements OnModuleInit, OnModuleDestroy {
     if (!openWAClient || openWAClient.userId !== userId) {
       throw new Error('Session not found or access denied');
     }
-    this.emitEvent(sessionId, userId, SessionStatus.LOADING);
+    
+    openWAClient.status = SessionStatus.INITIALIZING;
+    this.emitEvent(sessionId, userId, SessionStatus.INITIALIZING);
+    
     try {
       const status = await this.request<{ state: string; qr?: string }>(
         openWAClient.client,
         'GET',
         `/api/sessions/${sessionId}/status`,
       );
-      switch (status.state) {
-        case 'CONNECTED':
-        case 'READY':
+      
+      const normalizedStatus = normalizeOpenWAStatus(status.state);
+      
+      switch (normalizedStatus) {
+        case SessionStatus.CONNECTED:
           openWAClient.status = SessionStatus.CONNECTED;
           openWAClient.phone = status.state;
           this.emitEvent(sessionId, userId, SessionStatus.CONNECTED);
+          await this.persistSessionToDb(sessionId, userId);
           break;
-        case 'QRCODE':
+        case SessionStatus.QR_READY:
           if (status.qr) {
-            openWAClient.status = SessionStatus.QR_GENERATED;
+            openWAClient.status = SessionStatus.QR_READY;
             openWAClient.qrCode = status.qr;
-            this.emitEvent(sessionId, userId, SessionStatus.QR_GENERATED, { qr: status.qr });
+            this.emitEvent(sessionId, userId, SessionStatus.QR_READY, { qr: status.qr });
+            await this.persistSessionToDb(sessionId, userId);
             this.startQrRefreshTimer(sessionId, userId);
           }
           break;
         default:
           this.emitEvent(sessionId, userId, SessionStatus.DISCONNECTED);
+          await this.persistSessionToDb(sessionId, userId);
       }
     } catch (error) {
       this.logger.error(`Failed to initialize session: ${sessionId}`, error);
-      this.emitEvent(sessionId, userId, SessionStatus.ERROR, {
+      openWAClient.status = SessionStatus.FAILED;
+      this.emitEvent(sessionId, userId, SessionStatus.FAILED, {
         error: 'Failed to initialize session',
       });
+      await this.persistSessionToDb(sessionId, userId);
     }
   }
 
@@ -274,7 +281,7 @@ export class SessionManagerService implements OnModuleInit, OnModuleDestroy {
     if (existingTimer) clearInterval(existingTimer);
     const timer = setInterval(async () => {
       const openWAClient = this.getClientBySessionId(sessionId);
-      if (!openWAClient || openWAClient.status !== SessionStatus.QR_GENERATED) {
+      if (!openWAClient || openWAClient.status !== SessionStatus.QR_READY) {
         clearInterval(timer);
         this.qrTimers.delete(sessionId);
         return;
@@ -289,18 +296,22 @@ export class SessionManagerService implements OnModuleInit, OnModuleDestroy {
         
         this.logger.log(`[SessionManager] QR REFRESH - Session ${sessionId} status: ${status.state}, phone: ${status.phone || 'none'}`);
         
-        if (status.state === 'QRCODE' && status.qr) {
+        const normalizedStatus = normalizeOpenWAStatus(status.state);
+        
+        if (normalizedStatus === SessionStatus.QR_READY && status.qr) {
           openWAClient.qrCode = status.qr;
-          this.emitEvent(sessionId, userId, SessionStatus.QR_UPDATED, { qr: status.qr });
-        } else if (status.state === 'CONNECTED' || status.state === 'READY') {
+          this.emitEvent(sessionId, userId, SessionStatus.QR_READY, { qr: status.qr });
+          await this.persistSessionToDb(sessionId, userId);
+        } else if (normalizedStatus === SessionStatus.CONNECTED || normalizedStatus === SessionStatus.READY) {
           openWAClient.status = SessionStatus.CONNECTED;
           // Capture the phone number from the status response
           openWAClient.phone = status.phone || openWAClient.phone;
           clearInterval(timer);
           this.qrTimers.delete(sessionId);
+          this.stopStatusPolling(sessionId);
           this.logger.log(`[SessionManager] QR REFRESH - Session ${sessionId} CONNECTED with phone: ${openWAClient.phone}`);
           this.emitEvent(sessionId, userId, SessionStatus.CONNECTED, { phone: openWAClient.phone });
-          this.emitEvent(sessionId, userId, SessionStatus.READY);
+          await this.persistSessionToDb(sessionId, userId);
         }
       } catch (error) {
         this.logger.error(`QR refresh error for ${sessionId}`, error);
@@ -315,21 +326,24 @@ export class SessionManagerService implements OnModuleInit, OnModuleDestroy {
       throw new Error('Session not found or access denied');
     }
     try {
-      const qrResponse = await this.request<{ qr: string }>(
+      const qrResponse = await this.request<{ qr?: string; qrCode?: string }>(
         openWAClient.client,
         'GET',
-        `/sessions/${sessionId}/qr`,
+        `/api/sessions/${sessionId}/qr`,
       );
-      if (qrResponse.qr) {
-        openWAClient.status = SessionStatus.QR_GENERATED;
-        openWAClient.qrCode = qrResponse.qr;
-        this.emitEvent(sessionId, userId, SessionStatus.QR_GENERATED, { qr: qrResponse.qr });
+      const qrCode = qrResponse.qr || qrResponse.qrCode;
+      if (qrCode) {
+        openWAClient.status = SessionStatus.QR_READY;
+        openWAClient.qrCode = qrCode;
+        this.emitEvent(sessionId, userId, SessionStatus.QR_READY, { qr: qrCode });
+        await this.persistSessionToDb(sessionId, userId);
         this.startQrRefreshTimer(sessionId, userId);
-        return qrResponse.qr;
+        this.startStatusPolling(sessionId, userId);
+        return qrCode;
       }
     } catch (error) {
       this.logger.error(`Failed to get QR code: ${sessionId}`, error);
-      this.emitEvent(sessionId, userId, SessionStatus.ERROR, { error: 'Failed to get QR code' });
+      this.emitEvent(sessionId, userId, SessionStatus.FAILED, { error: 'Failed to get QR code' });
     }
     return null;
   }
@@ -345,7 +359,8 @@ export class SessionManagerService implements OnModuleInit, OnModuleDestroy {
     }
 
     this.logger.log(`[SessionManager] START SESSION - Starting session ${sessionId}`);
-    this.emitEvent(sessionId, userId, SessionStatus.LOADING);
+    openWAClient.status = SessionStatus.INITIALIZING;
+    this.emitEvent(sessionId, userId, SessionStatus.INITIALIZING);
 
     try {
       const fullUrl = `${this.baseURL}/api/sessions/${sessionId}/start`;
@@ -363,7 +378,9 @@ export class SessionManagerService implements OnModuleInit, OnModuleDestroy {
 
       if (response.status === 200 || response.status === 201) {
         this.logger.log(`[SessionManager] START SESSION - Session started successfully`);
-        this.emitEvent(sessionId, userId, SessionStatus.QR_GENERATED);
+        openWAClient.status = SessionStatus.QR_READY;
+        this.emitEvent(sessionId, userId, SessionStatus.QR_READY);
+        await this.persistSessionToDb(sessionId, userId);
       }
     } catch (error) {
       const axiosError = error as AxiosError;
@@ -372,7 +389,9 @@ export class SessionManagerService implements OnModuleInit, OnModuleDestroy {
       this.logger.error(
         `[SessionManager] START SESSION - Response: ${JSON.stringify(axiosError.response?.data)}`,
       );
-      this.emitEvent(sessionId, userId, SessionStatus.ERROR, { error: 'Failed to start session' });
+      openWAClient.status = SessionStatus.FAILED;
+      this.emitEvent(sessionId, userId, SessionStatus.FAILED, { error: 'Failed to start session' });
+      await this.persistSessionToDb(sessionId, userId);
       throw new Error(`Failed to start session: ${axiosError.message}`);
     }
   }
@@ -417,10 +436,12 @@ export class SessionManagerService implements OnModuleInit, OnModuleDestroy {
 
         const qrCode = qrResponse.data?.qr || qrResponse.data?.qrCode;
         if (qrCode) {
-          openWAClient.status = SessionStatus.QR_GENERATED;
+          openWAClient.status = SessionStatus.QR_READY;
           openWAClient.qrCode = qrCode;
-          this.emitEvent(sessionId, userId, SessionStatus.QR_GENERATED, { qr: qrCode });
+          this.emitEvent(sessionId, userId, SessionStatus.QR_READY, { qr: qrCode });
+          await this.persistSessionToDb(sessionId, userId);
           this.startQrRefreshTimer(sessionId, userId);
+          this.startStatusPolling(sessionId, userId);
           this.logger.log(`[SessionManager] POLL QR - QR code received on attempt ${attempt}`);
           return qrCode;
         }
@@ -439,6 +460,7 @@ export class SessionManagerService implements OnModuleInit, OnModuleDestroy {
             `[SessionManager] POLL QR - Session already connected on attempt ${attempt}`,
           );
           openWAClient.status = SessionStatus.CONNECTED;
+          await this.persistSessionToDb(sessionId, userId);
           return null;
         }
       } catch (error) {
@@ -473,7 +495,7 @@ export class SessionManagerService implements OnModuleInit, OnModuleDestroy {
       const status = await this.request<{ state: string; qr?: string }>(
         openWAClient.client,
         'GET',
-        `/sessions/${sessionId}/status`,
+        `/api/sessions/${sessionId}/status`,
       );
       return { state: status.state, qr: status.qr, phone: openWAClient.phone };
     } catch (error) {
@@ -488,17 +510,22 @@ export class SessionManagerService implements OnModuleInit, OnModuleDestroy {
       throw new Error('Session not found or access denied');
     }
     this.logger.log(`Reconnecting session: ${sessionId}`);
-    this.emitEvent(sessionId, userId, SessionStatus.RECONNECTING);
+    openWAClient.status = SessionStatus.CONNECTING;
+    this.emitEvent(sessionId, userId, SessionStatus.CONNECTING);
+    await this.persistSessionToDb(sessionId, userId);
+    
     try {
       await this.request<{ success: boolean }>(
         openWAClient.client,
         'POST',
-        `/sessions/${sessionId}/reconnect`,
+        `/api/sessions/${sessionId}/start`,
       );
       this.scheduleReconnectCheck(sessionId, userId);
     } catch (error) {
       this.logger.error(`Failed to reconnect session: ${sessionId}`, error);
-      this.emitEvent(sessionId, userId, SessionStatus.ERROR, { error: 'Failed to reconnect' });
+      openWAClient.status = SessionStatus.FAILED;
+      this.emitEvent(sessionId, userId, SessionStatus.FAILED, { error: 'Failed to reconnect' });
+      await this.persistSessionToDb(sessionId, userId);
       this.scheduleReconnectRetry(sessionId, userId);
     }
   }
@@ -511,13 +538,17 @@ export class SessionManagerService implements OnModuleInit, OnModuleDestroy {
         const status = await this.request<{ state: string }>(
           openWAClient.client,
           'GET',
-          `/sessions/${sessionId}/status`,
+          `/api/sessions/${sessionId}/status`,
         );
-        if (status.state === 'CONNECTED' || status.state === 'READY') {
+        const normalizedStatus = normalizeOpenWAStatus(status.state);
+        if (normalizedStatus === SessionStatus.CONNECTED) {
           openWAClient.status = SessionStatus.CONNECTED;
           this.emitEvent(sessionId, userId, SessionStatus.CONNECTED);
-        } else if (status.state === 'DISCONNECTED') {
+          await this.persistSessionToDb(sessionId, userId);
+        } else if (normalizedStatus === SessionStatus.DISCONNECTED) {
+          openWAClient.status = SessionStatus.DISCONNECTED;
           this.emitEvent(sessionId, userId, SessionStatus.DISCONNECTED);
+          await this.persistSessionToDb(sessionId, userId);
         }
       } catch (error) {
         this.logger.error(`Reconnect check failed: ${sessionId}`, error);
@@ -540,19 +571,26 @@ export class SessionManagerService implements OnModuleInit, OnModuleDestroy {
       throw new Error('Session not found or access denied');
     }
     this.logger.log(`Logging out session: ${sessionId}`);
+    
+    // Stop any pending timers
+    this.stopQrRefreshTimer(sessionId);
+    this.stopStatusPolling(sessionId);
+    
     try {
       await this.request<{ success: boolean }>(
         openWAClient.client,
         'POST',
-        `/sessions/${sessionId}/logout`,
+        `/api/sessions/${sessionId}/logout`,
       );
-      openWAClient.status = SessionStatus.DISCONNECTED;
-      openWAClient.qrCode = undefined;
-      openWAClient.phone = undefined;
-      this.emitEvent(sessionId, userId, SessionStatus.DISCONNECTED);
     } catch (error) {
-      this.logger.error(`Failed to logout session: ${sessionId}`, error);
+      this.logger.warn(`Logout API call failed for session: ${sessionId}`, error);
     }
+    
+    openWAClient.status = SessionStatus.LOGGED_OUT;
+    openWAClient.qrCode = undefined;
+    openWAClient.phone = undefined;
+    this.emitEvent(sessionId, userId, SessionStatus.LOGGED_OUT);
+    await this.persistSessionToDb(sessionId, userId);
   }
 
   async destroySession(sessionId: string, userId: string): Promise<void> {
@@ -561,25 +599,22 @@ export class SessionManagerService implements OnModuleInit, OnModuleDestroy {
       throw new Error('Session not found or access denied');
     }
     this.logger.log(`Destroying session: ${sessionId}`);
-    const qrTimer = this.qrTimers.get(sessionId);
-    if (qrTimer) {
-      clearInterval(qrTimer);
-      this.qrTimers.delete(sessionId);
-    }
-    const reconnectTimer = this.reconnectTimers.get(sessionId);
-    if (reconnectTimer) {
-      clearTimeout(reconnectTimer);
-      this.reconnectTimers.delete(sessionId);
-    }
+    
+    // Stop all timers
+    this.stopQrRefreshTimer(sessionId);
+    this.stopStatusPolling(sessionId);
+    
     try {
       await this.request<{ success: boolean }>(
         openWAClient.client,
         'DELETE',
-        `/sessions/${sessionId}`,
+        `/api/sessions/${sessionId}`,
       );
     } catch (error) {
       this.logger.warn(`Failed to delete session from OpenWA: ${sessionId}`, error);
     }
+    
+    // Remove from memory
     this.clients.delete(sessionId);
     const userSessionIds = this.userSessions.get(userId) || [];
     const index = userSessionIds.indexOf(sessionId);
@@ -587,8 +622,29 @@ export class SessionManagerService implements OnModuleInit, OnModuleDestroy {
       userSessionIds.splice(index, 1);
       this.userSessions.set(userId, userSessionIds);
     }
+    
     this.deleteSessionFiles(sessionId);
-    this.emitEvent(sessionId, userId, SessionStatus.DESTROYED);
+    
+    // Delete from Supabase
+    await this.deleteSessionFromDb(sessionId);
+    
+    this.emitEvent(sessionId, userId, SessionStatus.DELETED);
+  }
+  
+  private stopQrRefreshTimer(sessionId: string): void {
+    const qrTimer = this.qrTimers.get(sessionId);
+    if (qrTimer) {
+      clearInterval(qrTimer);
+      this.qrTimers.delete(sessionId);
+    }
+  }
+  
+  private stopStatusPolling(sessionId: string): void {
+    const pollingTimer = this.statusPollingIntervals.get(sessionId);
+    if (pollingTimer) {
+      clearInterval(pollingTimer);
+      this.statusPollingIntervals.delete(sessionId);
+    }
   }
 
   private deleteSessionFiles(sessionId: string): void {
@@ -621,6 +677,147 @@ export class SessionManagerService implements OnModuleInit, OnModuleDestroy {
     } catch (error) {
       this.logger.error(`Failed to save session state: ${sessionId}`, error);
     }
+  }
+
+  /**
+   * Persist session state to Supabase database
+   */
+  private async persistSessionToDb(sessionId: string, userId: string): Promise<void> {
+    const openWAClient = this.getClientBySessionId(sessionId);
+    if (!openWAClient) return;
+    
+    try {
+      // Map our status to the database status format
+      const dbStatus = this.mapStatusToDb(openWAClient.status);
+      
+      const sessionData = {
+        user_id: userId,
+        name: sessionId,
+        status: dbStatus,
+        phone: openWAClient.phone || null,
+        device_name: openWAClient.deviceName || null,
+        qr_code: openWAClient.qrCode || null,
+        is_active: openWAClient.status === SessionStatus.CONNECTED,
+        updated_at: new Date().toISOString(),
+      };
+      
+      // Check if session exists in DB
+      const { data: existing } = await this.supabaseService.query('sessions', {
+        select: 'id',
+        eq: { id: sessionId },
+      });
+      
+      if (existing && existing.length > 0) {
+        // Update existing session
+        await this.supabaseService.update('sessions', sessionId, sessionData);
+        this.logger.log(`[SessionManager] Updated session in DB: ${sessionId}`);
+      } else {
+        // Insert new session
+        const insertData = {
+          id: sessionId,
+          ...sessionData,
+          message_count: openWAClient.messageCount,
+          created_at: new Date().toISOString(),
+        };
+        await this.supabaseService.insert('sessions', insertData);
+        this.logger.log(`[SessionManager] Created session in DB: ${sessionId}`);
+      }
+    } catch (error) {
+      this.logger.error(`[SessionManager] Failed to persist session to DB: ${sessionId}`, error);
+    }
+  }
+  
+  /**
+   * Delete session from Supabase database
+   */
+  private async deleteSessionFromDb(sessionId: string): Promise<void> {
+    try {
+      await this.supabaseService.delete('sessions', sessionId);
+      this.logger.log(`[SessionManager] Deleted session from DB: ${sessionId}`);
+    } catch (error) {
+      this.logger.error(`[SessionManager] Failed to delete session from DB: ${sessionId}`, error);
+    }
+  }
+  
+  /**
+   * Map our unified SessionStatus to database session_status enum
+   * Database values: 'pending', 'connected', 'disconnected', 'error'
+   */
+  private mapStatusToDb(status: SessionStatus): string {
+    switch (status) {
+      case SessionStatus.CREATING:
+      case SessionStatus.INITIALIZING:
+        return 'pending';
+      case SessionStatus.QR_READY:
+      case SessionStatus.PAIRING_READY:
+      case SessionStatus.CONNECTING:
+      case SessionStatus.CONNECTED:
+      case SessionStatus.READY:
+        return 'connected';
+      case SessionStatus.DISCONNECTED:
+      case SessionStatus.LOGGED_OUT:
+        return 'disconnected';
+      case SessionStatus.FAILED:
+      case SessionStatus.DELETED:
+      default:
+        return 'error';
+    }
+  }
+
+  /**
+   * Start polling for status changes - this detects when the session becomes connected
+   */
+  private startStatusPolling(sessionId: string, userId: string): void {
+    const existingTimer = this.statusPollingIntervals.get(sessionId);
+    if (existingTimer) clearInterval(existingTimer);
+    
+    const timer = setInterval(async () => {
+      const openWAClient = this.getClientBySessionId(sessionId);
+      if (!openWAClient) {
+        clearInterval(timer);
+        this.statusPollingIntervals.delete(sessionId);
+        return;
+      }
+      
+      // Only poll if session is not already connected
+      if (openWAClient.status === SessionStatus.CONNECTED || 
+          openWAClient.status === SessionStatus.READY) {
+        clearInterval(timer);
+        this.statusPollingIntervals.delete(sessionId);
+        return;
+      }
+      
+      try {
+        const status = await this.request<{ state: string; phone?: string }>(
+          openWAClient.client,
+          'GET',
+          `/api/sessions/${sessionId}/status`,
+        );
+        
+        const normalizedStatus = normalizeOpenWAStatus(status.state);
+        
+        if (normalizedStatus === SessionStatus.CONNECTED || normalizedStatus === SessionStatus.READY) {
+          openWAClient.status = SessionStatus.CONNECTED;
+          if (status.phone) {
+            openWAClient.phone = status.phone;
+          }
+          this.logger.log(`[SessionManager] STATUS POLL - Session ${sessionId} CONNECTED with phone: ${openWAClient.phone}`);
+          this.emitEvent(sessionId, userId, SessionStatus.CONNECTED, { phone: openWAClient.phone });
+          await this.persistSessionToDb(sessionId, userId);
+          
+          // Stop polling
+          clearInterval(timer);
+          this.statusPollingIntervals.delete(sessionId);
+          
+          // Also stop QR refresh timer
+          this.stopQrRefreshTimer(sessionId);
+        }
+      } catch (error) {
+        this.logger.warn(`[SessionManager] STATUS POLL - Error for ${sessionId}: ${error}`);
+      }
+    }, 3000); // Poll every 3 seconds
+    
+    this.statusPollingIntervals.set(sessionId, timer);
   }
 
   private async restoreExistingSessions(): Promise<void> {

@@ -17,6 +17,7 @@ import { SupabaseService } from '../supabase/supabase.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { ActivityLogService } from './activity-log.service';
+import { SessionStatus } from '../../common/types/session.types';
 
 interface AuthenticatedRequest extends Request {
   user: {
@@ -333,10 +334,10 @@ export class AdminSessionController {
 
     return {
       totalSessions: allSessions.length,
-      connectedSessions: allSessions.filter((s) => s.status === 'connected' || s.status === 'ready')
+      connectedSessions: allSessions.filter((s) => s.status === SessionStatus.CONNECTED || s.status === SessionStatus.READY)
         .length,
       disconnectedSessions: allSessions.filter(
-        (s) => s.status === 'disconnected' || s.status === 'destroyed',
+        (s) => s.status === SessionStatus.DISCONNECTED || s.status === SessionStatus.DELETED,
       ).length,
       totalMessages: allSessions.reduce((sum, s) => sum + s.messageCount, 0),
       dbSessionCount: dbSessions?.length || 0,

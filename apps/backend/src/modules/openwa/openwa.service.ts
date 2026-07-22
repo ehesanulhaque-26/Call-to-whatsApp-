@@ -1,6 +1,7 @@
 import { Injectable, Logger, HttpException, HttpStatus } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios, { AxiosInstance, AxiosError } from 'axios';
+import { SessionStatus, normalizeOpenWAStatus } from '../../common/types/session.types';
 
 /**
  * Separate axios instance for fire-and-forget requests
@@ -37,44 +38,6 @@ export interface OpenWASession {
   config?: Record<string, unknown>;
   proxyUrl?: string;
   proxyType?: string;
-}
-
-// Session status enum (normalized to uppercase)
-// NOTE: OpenWA API returns lowercase status strings (e.g., 'qr_ready')
-// We normalize them to uppercase to match this enum
-export enum SessionStatus {
-  CREATED = 'CREATED',
-  QR_READY = 'QR_READY',
-  CONNECTING = 'CONNECTING',
-  READY = 'READY',
-  DISCONNECTED = 'DISCONNECTED',
-  FAILED = 'FAILED',
-}
-
-/**
- * Normalize OpenWA status string to match SessionStatus enum
- * OpenWA returns lowercase status strings (e.g., 'qr_ready', 'created')
- * This function converts them to uppercase (e.g., 'QR_READY', 'CREATED')
- */
-function normalizeSessionStatus(status: string | undefined): SessionStatus {
-  if (!status) return SessionStatus.DISCONNECTED;
-  const upperStatus = status.toUpperCase() as Uppercase<typeof status>;
-  switch (upperStatus) {
-    case 'CREATED':
-      return SessionStatus.CREATED;
-    case 'QR_READY':
-      return SessionStatus.QR_READY;
-    case 'CONNECTING':
-      return SessionStatus.CONNECTING;
-    case 'READY':
-      return SessionStatus.READY;
-    case 'DISCONNECTED':
-      return SessionStatus.DISCONNECTED;
-    case 'FAILED':
-      return SessionStatus.FAILED;
-    default:
-      return SessionStatus.DISCONNECTED;
-  }
 }
 
 // QR Code response from OpenWA
@@ -325,7 +288,7 @@ export class OpenWAService {
   async getSession(sessionId: string): Promise<OpenWASession> {
     const session = await this.request<OpenWASession>('GET', `/api/sessions/${sessionId}`);
     // Normalize the status from OpenWA (lowercase) to match our enum (uppercase)
-    session.status = normalizeSessionStatus(session.status);
+    session.status = normalizeOpenWAStatus(session.status);
     return session;
   }
 
@@ -343,7 +306,7 @@ export class OpenWAService {
       if (sessions) {
         for (const session of sessions) {
           // Normalize status for each session
-          session.status = normalizeSessionStatus(session.status);
+          session.status = normalizeOpenWAStatus(session.status);
           this.logger.warn(
             `[OpenWA Service]   - Session: ${session.id}, status: ${session.status}`,
           );
@@ -651,7 +614,7 @@ export class OpenWAService {
 
       // Normalize the status from OpenWA (lowercase) to match our enum (uppercase)
       // This is critical - OpenWA returns "qr_ready" but we expect "QR_READY"
-      const normalizedStatus = normalizeSessionStatus(session.status);
+      const normalizedStatus = normalizeOpenWAStatus(session.status);
 
       this.logger.warn(
         `[OpenWA Service] GET SESSION STATUS - Session data: ${JSON.stringify({
@@ -670,7 +633,7 @@ export class OpenWAService {
       // Using normalized status for comparison
       if (
         normalizedStatus === SessionStatus.QR_READY ||
-        normalizedStatus === SessionStatus.CREATED
+        normalizedStatus === SessionStatus.CREATING
       ) {
         try {
           this.logger.warn(
@@ -679,7 +642,7 @@ export class OpenWAService {
           const qrResponse = await this.getQRCode(sessionId);
 
           // Also normalize QR response status
-          const qrNormalizedStatus = normalizeSessionStatus(qrResponse?.status);
+          const qrNormalizedStatus = normalizeOpenWAStatus(qrResponse?.status);
 
           this.logger.warn(
             `[OpenWA Service] GET SESSION STATUS - QR response: ${JSON.stringify({
