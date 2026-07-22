@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_tokens.dart';
+import '../../../whatsapp/presentation/providers/whatsapp_provider.dart';
 
 /// User contacts screen with mobile-first design
 class UserContactsScreen extends ConsumerStatefulWidget {
@@ -23,10 +24,36 @@ class _UserContactsScreenState extends ConsumerState<UserContactsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final whatsAppState = ref.watch(whatsAppProvider);
+    final contacts = whatsAppState.contacts;
+    final syncStatus = whatsAppState.contactSyncStatus;
+    final activeSession = whatsAppState.activeSession;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Contacts'),
         centerTitle: true,
+        actions: [
+          if (activeSession != null && whatsAppState.isConnected)
+            IconButton(
+              icon: syncStatus == ContactSyncStatus.syncing
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.refresh),
+              onPressed: syncStatus == ContactSyncStatus.syncing
+                  ? null
+                  : () {
+                      HapticFeedback.mediumImpact();
+                      ref
+                          .read(whatsAppProvider.notifier)
+                          .syncContacts(activeSession.sessionId);
+                    },
+              tooltip: 'Refresh Contacts',
+            ),
+        ],
       ),
       body: Column(
         children: [
@@ -57,13 +84,51 @@ class _UserContactsScreenState extends ConsumerState<UserContactsScreen> {
             ),
           ),
 
+          // Sync status indicator
+          if (whatsAppState.isConnected && contacts.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+              child: Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  child: Row(
+                    children: [
+                      if (syncStatus == ContactSyncStatus.syncing)
+                        const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      else
+                        const Icon(Icons.sync, size: 16),
+                      const SizedBox(width: AppSpacing.sm),
+                      Text(
+                        syncStatus == ContactSyncStatus.syncing
+                            ? 'Syncing contacts...'
+                            : syncStatus == ContactSyncStatus.completed
+                                ? '${whatsAppState.lastSyncedContactCount} contacts synced'
+                                : 'Tap refresh to sync contacts',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
           // Contacts list
           Expanded(
             child: RefreshIndicator(
               onRefresh: () async {
                 HapticFeedback.mediumImpact();
+                final session = activeSession;
+                if (session != null && whatsAppState.isConnected) {
+                  await ref
+                      .read(whatsAppProvider.notifier)
+                      .syncContacts(session.sessionId);
+                }
               },
-              child: _buildContactsList(),
+              child: _buildContactsList(contacts),
             ),
           ),
         ],
@@ -71,19 +136,13 @@ class _UserContactsScreenState extends ConsumerState<UserContactsScreen> {
     );
   }
 
-  Widget _buildContactsList() {
-    // Sample contacts data
-    final contacts = [
-      {'name': 'John Doe', 'phone': '+1234567890', 'pushname': 'Johnny'},
-      {'name': 'Jane Smith', 'phone': '+0987654321', 'pushname': 'Jane'},
-      {'name': 'Bob Wilson', 'phone': '+1122334455', 'pushname': 'Bobby'},
-    ];
-
+  Widget _buildContactsList(List<WhatsAppContact> contacts) {
     final filteredContacts = contacts.where((c) {
       if (_searchQuery.isEmpty) return true;
       final query = _searchQuery.toLowerCase();
-      return (c['name'] as String).toLowerCase().contains(query) ||
-          (c['phone'] as String).contains(query);
+      return (c.name ?? '').toLowerCase().contains(query) ||
+          (c.pushName ?? '').toLowerCase().contains(query) ||
+          c.phone.contains(query);
     }).toList();
 
     if (filteredContacts.isEmpty) {
@@ -138,7 +197,7 @@ class _UserContactsScreenState extends ConsumerState<UserContactsScreen> {
     );
   }
 
-  void _showContactDetails(BuildContext context, Map<String, String> contact) {
+  void _showContactDetails(BuildContext context, WhatsAppContact contact) {
     showModalBottomSheet(
       context: context,
       builder: (context) => Container(
@@ -153,22 +212,44 @@ class _UserContactsScreenState extends ConsumerState<UserContactsScreen> {
                 color: AppColors.primary.withOpacity(0.1),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
-                Icons.person,
-                size: 40,
-                color: AppColors.primary,
-              ),
+              child: contact.profilePictureUrl != null
+                  ? ClipOval(
+                      child: Image.network(
+                        contact.profilePictureUrl!,
+                        width: 80,
+                        height: 80,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => const Icon(
+                          Icons.person,
+                          size: 40,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    )
+                  : Text(
+                      (contact.name ?? contact.pushName ?? '?').isNotEmpty
+                          ? (contact.name ?? contact.pushName ?? '?')[0]
+                              .toUpperCase()
+                          : '?',
+                      style: const TextStyle(
+                        fontSize: 40,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.primary,
+                      ),
+                    ),
             ),
             const SizedBox(height: AppSpacing.md),
             Text(
-              contact['name'] ?? '',
+              contact.name ?? contact.pushName ?? 'Unknown',
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
             ),
-            if (contact['pushname'] != null && contact['pushname']!.isNotEmpty)
+            if (contact.name != null &&
+                contact.pushName != null &&
+                contact.name != contact.pushName)
               Text(
-                contact['pushname']!,
+                contact.pushName!,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: AppColors.textSecondary,
                     ),
@@ -176,9 +257,20 @@ class _UserContactsScreenState extends ConsumerState<UserContactsScreen> {
             const SizedBox(height: AppSpacing.lg),
             ListTile(
               leading: const Icon(Icons.phone, color: AppColors.primary),
-              title: Text(contact['phone'] ?? ''),
+              title: Text(contact.phone),
               subtitle: const Text('Mobile'),
             ),
+            ListTile(
+                leading: const Icon(Icons.chat, color: AppColors.primary),
+                title: Text(contact.id),
+                subtitle: const Text('WhatsApp ID'),
+              ),
+            if (contact.isBusiness == true)
+              const ListTile(
+                leading: Icon(Icons.business, color: AppColors.primary),
+                title: Text('Business Account'),
+                subtitle: Text('This is a WhatsApp Business account'),
+              ),
             const SizedBox(height: AppSpacing.lg),
             Row(
               children: [
@@ -210,12 +302,12 @@ class _UserContactsScreenState extends ConsumerState<UserContactsScreen> {
 class _ContactCard extends StatelessWidget {
   const _ContactCard({required this.contact, required this.onTap});
 
-  final Map<String, String> contact;
+  final WhatsAppContact contact;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final name = contact['name'] ?? '';
+    final name = contact.name ?? contact.pushName ?? '';
     final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
 
     return Card(
@@ -231,13 +323,18 @@ class _ContactCard extends StatelessWidget {
         ),
         leading: CircleAvatar(
           backgroundColor: AppColors.primary,
-          child: Text(
-            initial,
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
+          backgroundImage: contact.profilePictureUrl != null
+              ? NetworkImage(contact.profilePictureUrl!)
+              : null,
+          child: contact.profilePictureUrl == null
+              ? Text(
+                  initial,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                )
+              : null,
         ),
         title: Text(
           name,
@@ -246,13 +343,14 @@ class _ContactCard extends StatelessWidget {
           ),
         ),
         subtitle: Text(
-          contact['phone'] ?? '',
+          contact.phone,
           style: AppTypography.bodySmall.copyWith(
             color: AppColors.textSecondary,
           ),
         ),
-        trailing:
-            const Icon(Icons.chevron_right, color: AppColors.textTertiary),
+        trailing: contact.isBusiness
+            ? const Icon(Icons.business, size: 16, color: AppColors.primary)
+            : const Icon(Icons.chevron_right, color: AppColors.textTertiary),
       ),
     );
   }

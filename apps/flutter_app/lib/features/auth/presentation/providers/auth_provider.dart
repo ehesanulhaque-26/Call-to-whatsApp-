@@ -170,8 +170,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
       // Use _ref.read to access the WhatsApp provider
       // We use read (not watch) because we're calling an action, not reading state
       final whatsappNotifier = _ref.read(whatsAppProvider.notifier);
-      whatsappNotifier.disconnect();
-      developer.log('[AuthNotifier] LOGOUT: WebSocket disconnected', name: 'Auth');
+      whatsappNotifier.disconnectAndReset();
+      developer.log('[AuthNotifier] LOGOUT: WhatsApp state reset', name: 'Auth');
     } catch (e) {
       developer.log('[AuthNotifier] LOGOUT: WebSocket disconnect error: $e', name: 'Auth');
     }

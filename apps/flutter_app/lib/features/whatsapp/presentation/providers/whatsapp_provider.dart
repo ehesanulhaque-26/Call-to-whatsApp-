@@ -382,6 +382,9 @@ class WhatsAppNotifier extends StateNotifier<WhatsAppState> {
       state = state.copyWith(error: error);
     });
 
+    // Load sessions from backend on init (supports persistence)
+    loadSessions();
+
     // Check server health on init
     checkServerHealth();
   }
@@ -527,6 +530,12 @@ class WhatsAppNotifier extends StateNotifier<WhatsAppState> {
   void disconnect() {
     _wsService.disconnect();
     state = state.copyWith(connectionState: ConnectionState.disconnected);
+  }
+
+  /// Disconnect and reset all state - used during logout
+  void disconnectAndReset() {
+    _wsService.disconnect();
+    resetState();
   }
 
 /// Load sessions from backend via REST API

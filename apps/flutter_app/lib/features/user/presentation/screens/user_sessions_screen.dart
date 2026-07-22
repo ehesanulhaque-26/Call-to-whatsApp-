@@ -486,7 +486,17 @@ class _QRConnectionSheetState extends ConsumerState<_QRConnectionSheet> {
   @override
   void initState() {
     super.initState();
-    _createSession();
+    _showNamingDialogAndCreate();
+  }
+
+  Future<void> _showNamingDialogAndCreate() async {
+    final sessionName = await _showSessionNameDialog();
+    if (sessionName != null && sessionName.isNotEmpty) {
+      _createSession(sessionName: sessionName);
+    } else if (sessionName != null) {
+      // User canceled, close the sheet
+      if (mounted) Navigator.pop(context);
+    }
   }
 
   @override
@@ -495,7 +505,7 @@ class _QRConnectionSheetState extends ConsumerState<_QRConnectionSheet> {
     super.dispose();
   }
 
-  Future<void> _createSession() async {
+  Future<void> _createSession({String? sessionName}) async {
     setState(() {
       _isLoading = true;
       _error = null;
@@ -503,7 +513,7 @@ class _QRConnectionSheetState extends ConsumerState<_QRConnectionSheet> {
 
     try {
       final repo = ref.read(whatsAppRepositoryProvider);
-      final session = await repo.createSession();
+      final session = await repo.createSession(sessionName: sessionName);
       setState(() {
         _sessionId = session.id;
         _isLoading = false;
@@ -515,6 +525,38 @@ class _QRConnectionSheetState extends ConsumerState<_QRConnectionSheet> {
         _error = 'Failed to create session';
       });
     }
+  }
+
+  Future<String?> _showSessionNameDialog() async {
+    final controller = TextEditingController();
+    final result = await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text('Session Name'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(
+            labelText: 'Enter session name',
+            hintText: 'e.g., Marketing, Sales, Support',
+          ),
+          textCapitalization: TextCapitalization.words,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, ''),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, controller.text),
+            child: const Text('Create'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    return result;
   }
 
   void _startPolling() {
