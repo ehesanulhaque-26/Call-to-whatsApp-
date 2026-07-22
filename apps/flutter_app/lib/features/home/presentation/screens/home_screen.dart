@@ -438,60 +438,70 @@ class HomeScreen extends ConsumerWidget {
             ),
             const SizedBox(height: AppSpacing.lg),
             // Quick Actions
-            Text(
-              'Quick Actions',
-              style: AppTypography.titleMedium.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.md),
-            _FeatureCard(
-              icon: Icons.chat_bubble,
-              title: 'WhatsApp Connection',
-              description: 'Manage your WhatsApp connection',
-              onTap: () => context.go(AppRoutes.sessions),
-            ),
-            // Show Sync Contacts when connected
-            if (whatsAppState.isConnected) ...[
-              const SizedBox(height: AppSpacing.sm),
-              _SyncContactsCard(
-                syncStatus: whatsAppState.contactSyncStatus,
-                lastSyncedCount: whatsAppState.lastSyncedContactCount,
-                onSync: () {
-                  final activeSession = whatsAppState.activeSession;
-                  if (activeSession != null) {
-                    ref.read(whatsAppProvider.notifier).syncContacts(activeSession.sessionId);
-                  }
-                },
-              ),
-            ],
-            const SizedBox(height: AppSpacing.lg),
-            Text(
-              'Coming Soon',
-              style: AppTypography.titleMedium.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.md),
-            const _FeatureCard(
-              icon: Icons.auto_awesome,
-              title: 'Automations',
-              description: 'Create automated message workflows',
-              isComing: true,
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            const _FeatureCard(
-              icon: Icons.campaign,
-              title: 'Campaigns',
-              description: 'Send bulk messages to contacts',
-              isComing: true,
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            const _FeatureCard(
-              icon: Icons.analytics,
-              title: 'Analytics',
-              description: 'Track your message performance',
-              isComing: true,
+            Consumer(
+              builder: (context, ref, _) {
+                final whatsAppState = ref.watch(whatsAppProvider);
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Quick Actions',
+                      style: AppTypography.titleMedium.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    _FeatureCard(
+                      icon: Icons.chat_bubble,
+                      title: 'WhatsApp Connection',
+                      description: 'Manage your WhatsApp connection',
+                      onTap: () => context.go(AppRoutes.sessions),
+                    ),
+                    // Show Sync Contacts when connected
+                    if (whatsAppState.isConnected) ...[
+                      const SizedBox(height: AppSpacing.sm),
+                      _SyncContactsCard(
+                        syncStatus: whatsAppState.contactSyncStatus,
+                        lastSyncedCount: whatsAppState.lastSyncedContactCount,
+                        onSync: () {
+                          final activeSession = whatsAppState.activeSession;
+                          if (activeSession != null) {
+                            ref.read(whatsAppProvider.notifier).syncContacts(activeSession.sessionId);
+                          }
+                        },
+                      ),
+                    ],
+                    const SizedBox(height: AppSpacing.lg),
+                    Text(
+                      'Coming Soon',
+                      style: AppTypography.titleMedium.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    const _FeatureCard(
+                      icon: Icons.auto_awesome,
+                      title: 'Automations',
+                      description: 'Create automated message workflows',
+                      isComing: true,
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    const _FeatureCard(
+                      icon: Icons.campaign,
+                      title: 'Campaigns',
+                      description: 'Send bulk messages to contacts',
+                      isComing: true,
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    const _FeatureCard(
+                      icon: Icons.analytics,
+                      title: 'Analytics',
+                      description: 'Track your message performance',
+                      isComing: true,
+                    ),
+                  ],
+                );
+              },
             ),
           ],
         ),

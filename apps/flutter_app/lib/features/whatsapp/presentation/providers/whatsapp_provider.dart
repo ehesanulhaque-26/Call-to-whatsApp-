@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:developer' as developer;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:openwa_saas/core/services/api_client.dart';
@@ -882,28 +881,7 @@ class WhatsAppNotifier extends StateNotifier<WhatsAppState> {
     destroySession(sessionId);
   }
 
-  /// Sync contacts
-  Future<void> syncContacts(String sessionId) async {
-    try {
-      state = state.copyWith(isLoading: true, error: null);
-      
-      await _apiClient.post<Map<String, dynamic>>(
-        '/openwa/sessions/$sessionId/sync-contacts',
-      );
-      
-      state = state.copyWith(isLoading: false);
-    } on DioException catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: e.message ?? 'Failed to sync contacts',
-      );
-    } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: 'Failed to sync contacts: $e',
-      );
-    }
-  }
+  
 
   /// Send text message
   Future<bool> sendTextMessage(String sessionId, String to, String text) async {
