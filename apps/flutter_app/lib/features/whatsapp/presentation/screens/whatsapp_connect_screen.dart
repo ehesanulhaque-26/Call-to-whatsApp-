@@ -62,8 +62,9 @@ class _WhatsAppConnectScreenState extends ConsumerState<WhatsAppConnectScreen>
   void dispose() {
     _phoneController.dispose();
     _successAnimationController.dispose();
-    // Reset pairing state when leaving screen
-    ref.read(whatsAppProvider.notifier).resetPhonePairing();
+    // NOTE: We no longer call resetPhonePairing() here.
+    // The state should persist if the widget is rebuilt (e.g., by parent).
+    // State will be reset when user explicitly navigates away via PopScope.
     super.dispose();
   }
 
@@ -150,38 +151,47 @@ class _WhatsAppConnectScreenState extends ConsumerState<WhatsAppConnectScreen>
       });
     }
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(_isQrMode ? 'Scan QR Code' : 'Connect WhatsApp'),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: _isQrMode
-            ? IconButton(
-                icon: const Icon(Icons.arrow_back),
-                onPressed: _onCancelQR,
-              )
-            : null,
-      ),
-      extendBodyBehindAppBar: true,
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              AppColors.primary.withOpacity(0.1),
-              Theme.of(context).scaffoldBackgroundColor,
-            ],
-          ),
+    return PopScope(
+      canPop: true,
+      onPopInvokedWithResult: (didPop, result) {
+        // When user explicitly navigates away, reset the pairing state
+        if (didPop) {
+          ref.read(whatsAppProvider.notifier).resetPhonePairing();
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(_isQrMode ? 'Scan QR Code' : 'Connect WhatsApp'),
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          leading: _isQrMode
+              ? IconButton(
+                  icon: const Icon(Icons.arrow_back),
+                  onPressed: _onCancelQR,
+                )
+              : null,
         ),
-        child: SafeArea(
-          child: _buildBody(
-            pairingStatus,
-            pairingCode,
-            pairingError,
-            phoneNumber,
-            qrCode,
-            sessionStatus,
+        extendBodyBehindAppBar: true,
+        body: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                AppColors.primary.withOpacity(0.1),
+                Theme.of(context).scaffoldBackgroundColor,
+              ],
+            ),
+          ),
+          child: SafeArea(
+            child: _buildBody(
+              pairingStatus,
+              pairingCode,
+              pairingError,
+              phoneNumber,
+              qrCode,
+              sessionStatus,
+            ),
           ),
         ),
       ),
