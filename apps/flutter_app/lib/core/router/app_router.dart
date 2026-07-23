@@ -293,22 +293,30 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.connectWhatsApp,
         name: 'connectWhatsApp',
-        pageBuilder: (context, state) => CustomTransitionPage(
-          key: state.pageKey,
-          child: const WhatsAppConnectScreen(),
-          transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            return SlideTransition(
-              position: Tween<Offset>(
-                begin: const Offset(0, 1),
-                end: Offset.zero,
-              ).animate(CurvedAnimation(
-                parent: animation,
-                curve: Curves.easeOutCubic,
-              )),
-              child: child,
-            );
-          },
-        ),
+        pageBuilder: (context, state) {
+          // Extract source parameter (default to 'home')
+          final source = state.uri.queryParameters['source'] ?? 'home';
+          final flow = state.uri.queryParameters['flow']; // 'phone' or 'qr'
+          return CustomTransitionPage(
+            key: state.pageKey,
+            child: WhatsAppConnectScreen(
+              source: source,
+              initialFlow: flow,
+            ),
+            transitionsBuilder: (context, animation, secondaryAnimation, child) {
+              return SlideTransition(
+                position: Tween<Offset>(
+                  begin: const Offset(0, 1),
+                  end: Offset.zero,
+                ).animate(CurvedAnimation(
+                  parent: animation,
+                  curve: Curves.easeOutCubic,
+                )),
+                child: child,
+              );
+            },
+          );
+        },
       ),
     ],
     errorBuilder: (context, state) => Scaffold(

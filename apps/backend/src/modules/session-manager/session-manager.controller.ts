@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Patch,
   Delete,
   Param,
   Body,
@@ -124,6 +125,29 @@ export class SessionManagerController {
       messageCount: session.messageCount,
       lastActivity: session.lastActivity,
     };
+  }
+
+  @Patch(':sessionId')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Update session details' })
+  @ApiParam({ name: 'sessionId', description: 'Session ID' })
+  @ApiResponse({ status: 200, description: 'Session updated' })
+  async updateSession(
+    @Req() req: AuthenticatedRequest,
+    @Param('sessionId') sessionId: string,
+    @Body() body: { name?: string },
+  ) {
+    const session = this.sessionManager.getClientBySessionId(sessionId);
+
+    if (!session || session.userId !== req.user.userId) {
+      throw new Error('Session not found or access denied');
+    }
+
+    if (body.name !== undefined) {
+      await this.sessionManager.updateSessionName(sessionId, req.user.userId, body.name);
+    }
+
+    return { success: true };
   }
 
   @Get(':sessionId/status')

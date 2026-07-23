@@ -9,7 +9,14 @@ import '../providers/whatsapp_provider.dart';
 
 /// WhatsApp Connect Screen - Phone Number Pairing Login
 class WhatsAppConnectScreen extends ConsumerStatefulWidget {
-  const WhatsAppConnectScreen({super.key});
+  const WhatsAppConnectScreen({
+    super.key,
+    this.source = 'home', // 'home' or 'session'
+    this.initialFlow, // 'phone' or 'qr'
+  });
+
+  final String source;
+  final String? initialFlow;
 
   @override
   ConsumerState<WhatsAppConnectScreen> createState() => _WhatsAppConnectScreenState();
@@ -56,6 +63,14 @@ class _WhatsAppConnectScreenState extends ConsumerState<WhatsAppConnectScreen>
         curve: const Interval(0.0, 0.5, curve: Curves.easeIn),
       ),
     );
+    
+    // Initialize connection mode based on initialFlow parameter
+    // For session-tab flow with initialFlow='phone', skip connection options
+    if (widget.initialFlow == 'phone') {
+      _isQrMode = false;
+    } else if (widget.initialFlow == 'qr') {
+      _isQrMode = true;
+    }
   }
 
   @override
@@ -284,6 +299,12 @@ class _WhatsAppConnectScreenState extends ConsumerState<WhatsAppConnectScreen>
       return _buildErrorState(pairingError);
     }
 
+    // For session-tab flow with phone selected, skip connection options and go directly to phone form
+    // This prevents showing QR option when user already selected Phone Number
+    if (widget.source == 'session' && widget.initialFlow == 'phone') {
+      return _buildPhoneInputState();
+    }
+
     // Default: show connection options
     return _buildConnectionOptionsState();
   }
@@ -448,6 +469,171 @@ class _WhatsAppConnectScreenState extends ConsumerState<WhatsAppConnectScreen>
               onPressed: _onConnectWithQR,
               label: 'Scan QR Code',
               icon: Icons.qr_code_scanner,
+            ),
+            
+            const SizedBox(height: AppSpacing.xxl),
+            
+            // Help Text
+            Container(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              decoration: BoxDecoration(
+                color: AppColors.info.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(AppRadius.lg),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.info_outline, color: AppColors.info, size: 20),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: Text(
+                      'A pairing code will be sent to your WhatsApp. Open the app to approve.',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppColors.info,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Phone input state without QR option - used for session-tab phone flow
+  Widget _buildPhoneInputState() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      child: Form(
+        key: _formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const SizedBox(height: AppSpacing.xxl),
+            
+            // WhatsApp Icon
+            Container(
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.phone_android,
+                size: 60,
+                color: AppColors.primary,
+              ),
+            ),
+            
+            const SizedBox(height: AppSpacing.xxl),
+            
+            // Title
+            Text(
+              'Connect using\nPhone Number',
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            
+            const SizedBox(height: AppSpacing.sm),
+            
+            Text(
+              'Link your WhatsApp account with a pairing code',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: AppColors.textSecondary,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            
+            const SizedBox(height: AppSpacing.xxl),
+            
+            // Phone Number Card
+            Card(
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppRadius.xl),
+                side: BorderSide(
+                  color: AppColors.primary.withOpacity(0.2),
+                ),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(AppSpacing.lg),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Country Picker
+                    Row(
+                      children: [
+                        GestureDetector(
+                          onTap: _showCountryPicker,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.md,
+                              vertical: AppSpacing.sm,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.surfaceVariant,
+                              borderRadius: BorderRadius.circular(AppRadius.md),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(_countryFlag, style: const TextStyle(fontSize: 24)),
+                                const SizedBox(width: AppSpacing.sm),
+                                Text(
+                                  _countryCode,
+                                  style: Theme.of(context).textTheme.titleMedium,
+                                ),
+                                const Icon(Icons.arrow_drop_down),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.md),
+                        // Phone Number Input
+                        Expanded(
+                          child: TextFormField(
+                            controller: _phoneController,
+                            keyboardType: TextInputType.phone,
+                            decoration: InputDecoration(
+                              hintText: 'Phone number',
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(AppRadius.md),
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: AppSpacing.md,
+                                vertical: AppSpacing.sm,
+                              ),
+                            ),
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Enter phone number';
+                              }
+                              if (value.length < 8) {
+                                return 'Enter valid phone number';
+                              }
+                              return null;
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            
+            const SizedBox(height: AppSpacing.lg),
+            
+            // Generate Pairing Code Button
+            _PrimaryActionButton(
+              onPressed: _onGeneratePairingCode,
+              label: 'Generate Pairing Code',
+              icon: Icons.lock_open,
+              isLoading: false,
             ),
             
             const SizedBox(height: AppSpacing.xxl),

@@ -504,6 +504,27 @@ export class SessionManagerService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  async updateSessionName(sessionId: string, userId: string, name: string): Promise<void> {
+    const openWAClient = this.getClientBySessionId(sessionId);
+    if (!openWAClient || openWAClient.userId !== userId) {
+      throw new Error('Session not found or access denied');
+    }
+
+    this.logger.log(`Updating session name: ${sessionId} to "${name}"`);
+
+    // Update in database
+    try {
+      await this.supabaseService.update('sessions', sessionId, {
+        name: name,
+        updated_at: new Date().toISOString(),
+      });
+      this.logger.log(`Session name updated in database: ${sessionId}`);
+    } catch (error) {
+      this.logger.error(`Failed to update session name in database: ${sessionId}`, error);
+      throw new Error('Failed to update session name');
+    }
+  }
+
   async reconnect(sessionId: string, userId: string): Promise<void> {
     const openWAClient = this.getClientBySessionId(sessionId);
     if (!openWAClient || openWAClient.userId !== userId) {

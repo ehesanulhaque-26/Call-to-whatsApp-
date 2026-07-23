@@ -213,7 +213,9 @@ class _ConnectionOptionsSheet extends StatelessWidget {
             color: AppColors.primary,
             onTap: () {
               Navigator.pop(context);
-              context.push(AppRoutes.connectWhatsApp);
+              // Navigate to phone flow with source=session to get session naming
+              // and skip the QR option (user already selected Phone)
+              context.push('${AppRoutes.connectWhatsApp}?source=session&flow=phone');
             },
           ),
           const SizedBox(height: AppSpacing.md),
@@ -843,7 +845,29 @@ class _SessionDetailsSheet extends ConsumerWidget {
                 ?.copyWith(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: AppSpacing.sm),
-          _StatusBadge(status: session.status ?? 'disconnected'),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _StatusBadge(status: session.status ?? 'disconnected'),
+              const SizedBox(width: AppSpacing.md),
+              // Edit/Rename button
+              IconButton(
+                icon: const Icon(Icons.edit, size: 18),
+                onPressed: () async {
+                  final newName = await _showRenameDialog(context, session.name ?? '');
+                  if (newName != null && newName.isNotEmpty && context.mounted) {
+                    await ref.read(whatsAppProvider.notifier).renameSession(session.id, newName);
+                    if (context.mounted) {
+                      Navigator.pop(context);
+                      ref.invalidate(sessionsProvider);
+                    }
+                  }
+                },
+                tooltip: 'Rename',
+                color: AppColors.primary,
+              ),
+            ],
+          ),
           const SizedBox(height: AppSpacing.xl),
           _DetailRow(label: 'Session ID', value: session.id),
           if (session.createdAt != null)
@@ -934,6 +958,37 @@ class _SessionDetailsSheet extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  Future<String?> _showRenameDialog(BuildContext context, String currentName) async {
+    final controller = TextEditingController(text: currentName);
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Rename Session'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(
+            labelText: 'Session name',
+            hintText: 'e.g., Marketing, Sales, Support',
+          ),
+          textCapitalization: TextCapitalization.words,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, controller.text),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    return result;
   }
 
   String _formatDate(String dateStr) {

@@ -449,11 +449,17 @@ class WhatsAppNotifier extends StateNotifier<WhatsAppState> {
         );
         break;
       case SessionEventType.disconnected:
-        updatedSession = session.copyWith(status: WhatsAppStatus.disconnected);
-        break;
+        // CRITICAL: Don't update session status to disconnected based on WebSocket events alone.
+        // The backend is the source of truth for session status.
+        // WebSocket disconnection doesn't mean the session is disconnected - it might just be
+        // the app being backgrounded or network fluctuation.
+        // When WebSocket reconnects, loadSessions() will fetch the actual status from backend.
+        developer.log('[WhatsAppProvider] WebSocket disconnected for session: $sessionId - preserving backend status', name: 'Session');
+        return; // Don't update status - preserve the backend status
       case SessionEventType.reconnecting:
-        updatedSession = session.copyWith(status: WhatsAppStatus.reconnecting);
-        break;
+        // Similarly, don't update to reconnecting based on WebSocket events alone
+        developer.log('[WhatsAppProvider] WebSocket reconnecting for session: $sessionId - preserving backend status', name: 'Session');
+        return; // Don't update status - preserve the backend status
       case SessionEventType.destroyed:
         final sessions = List<WhatsAppSession>.from(state.sessions);
         sessions.removeWhere((s) => s.sessionId == sessionId);
@@ -837,6 +843,40 @@ class WhatsAppNotifier extends StateNotifier<WhatsAppState> {
         isLoading: false,
         error: 'Failed to delete session: $e',
       );
+    }
+  }
+
+  /// Rename a session
+  Future<bool> renameSession(String sessionId, String newName) async {
+    try {
+      final response = await _apiClient.patch<Map<String, dynamic>>(
+        '/openwa/sessions/$sessionId',
+        data: {'name': newName},
+      );
+
+      if (response.data?['success'] == true) {
+        // Update local state
+        final sessions = List<WhatsAppSession>.from(state.sessions);
+        final index = sessions.indexWhere((s) => s.sessionId == sessionId);
+        if (index >= 0) {
+          sessions[index] = sessions[index].copyWith(name: newName);
+          state = state.copyWith(sessions: sessions);
+          
+          // Update active session if it's the renamed one
+          if (state.activeSession?.sessionId == sessionId) {
+            state = state.copyWith(activeSession: sessions[index]);
+          }
+        }
+        developer.log('[WhatsAppProvider] Session renamed: $sessionId -> $newName', name: 'Session');
+        return true;
+      }
+      return false;
+    } on DioException catch (e) {
+      developer.log('[WhatsAppProvider] Failed to rename session: ${e.message}', name: 'Session');
+      return false;
+    } catch (e) {
+      developer.log('[WhatsAppProvider] Failed to rename session: $e', name: 'Session');
+      return false;
     }
   }
 
